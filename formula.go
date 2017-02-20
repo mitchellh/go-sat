@@ -27,6 +27,21 @@ func NewFormulaFromInts(raw [][]int) Formula {
 	return Formula(cs)
 }
 
+// Negate the formula by negating all literals in all clauses.
+func (f Formula) Negate() Formula {
+	result := make([]Clause, len(f))
+	for i, c := range f {
+		resultC := make([]Literal, len(c))
+		for j, l := range c {
+			resultC[j] = Literal(-int(l))
+		}
+
+		result[i] = Clause(resultC)
+	}
+
+	return Formula(result)
+}
+
 func (f Formula) Vars() []Literal {
 	set := make(map[Literal]struct{})
 	for _, c := range f {

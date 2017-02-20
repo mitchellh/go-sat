@@ -6,6 +6,8 @@ import (
 )
 
 func TestSolve(t *testing.T) {
+	Trace = true
+
 	cases := []struct {
 		Name    string
 		Formula [][]int
@@ -20,6 +22,25 @@ func TestSolve(t *testing.T) {
 		{
 			"single literal",
 			[][]int{[]int{4}},
+			true,
+		},
+
+		{
+			"unsatisfiable with backtrack",
+			[][]int{
+				[]int{4},
+				[]int{6},
+				[]int{-4, -6},
+			},
+			false,
+		},
+
+		{
+			"satisfiable with backtrack",
+			[][]int{
+				[]int{-4},
+				[]int{4, -6},
+			},
 			true,
 		},
 	}

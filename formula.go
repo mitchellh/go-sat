@@ -42,18 +42,21 @@ func (f Formula) Negate() Formula {
 	return Formula(result)
 }
 
-func (f Formula) Vars() []Literal {
+func (f Formula) Vars() map[Literal]struct{} {
 	set := make(map[Literal]struct{})
 	for _, c := range f {
 		for _, l := range c {
+			if l < 0 {
+				l = -l
+			}
+
 			set[l] = struct{}{}
 		}
 	}
 
-	result := make([]Literal, 0, len(set))
-	for k, _ := range set {
-		result = append(result, k)
-	}
+	return set
+}
 
-	return result
+func (l Literal) Negate() Literal {
+	return Literal(int(l) * -1)
 }

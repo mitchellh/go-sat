@@ -3,6 +3,8 @@ package sat
 import (
 	"fmt"
 	"strings"
+
+	"github.com/mitchellh/go-sat/cnf"
 )
 
 // trail is the state of the solver that contains the list of literals
@@ -10,7 +12,7 @@ import (
 type trail []trailElem
 
 type trailElem struct {
-	Lit      Literal
+	Lit      cnf.Literal
 	Decision bool
 }
 
@@ -28,7 +30,7 @@ func (t trail) DecisionsLen() int {
 
 // TrimToLastDecision trims the trail to the last decision (but not including
 // it) and returns the last decision literal.
-func (t *trail) TrimToLastDecision() Literal {
+func (t *trail) TrimToLastDecision() cnf.Literal {
 	var i int
 	for i = len(*t) - 1; i >= 0; i-- {
 		if (*t)[i].Decision {
@@ -59,7 +61,7 @@ func (t trail) String() string {
 }
 
 // Assert adds the new literal to the trail.
-func (t *trail) Assert(l Literal, d bool) {
+func (t *trail) Assert(l cnf.Literal, d bool) {
 	*t = append(*t, trailElem{
 		Lit:      l,
 		Decision: d,
@@ -68,7 +70,7 @@ func (t *trail) Assert(l Literal, d bool) {
 
 // IsFormulaFalse returns true if the given Formula f is false in the
 // current valuation (trail).
-func (t trail) IsFormulaFalse(f Formula) bool {
+func (t trail) IsFormulaFalse(f cnf.Formula) bool {
 	// If we have no trail, we can't contain the negated formula
 	if len(t) == 0 {
 		return false
@@ -84,7 +86,7 @@ func (t trail) IsFormulaFalse(f Formula) bool {
 	return false
 }
 
-func (t trail) IsClauseFalse(c Clause) bool {
+func (t trail) IsClauseFalse(c cnf.Clause) bool {
 	for _, l := range c {
 		if !t.IsLiteralFalse(l) {
 			return false
@@ -94,7 +96,7 @@ func (t trail) IsClauseFalse(c Clause) bool {
 	return true
 }
 
-func (t trail) IsLiteralFalse(l Literal) bool {
+func (t trail) IsLiteralFalse(l cnf.Literal) bool {
 	l = l.Negate()
 	for _, e := range t {
 		if e.Lit == l {
@@ -105,7 +107,7 @@ func (t trail) IsLiteralFalse(l Literal) bool {
 	return false
 }
 
-func (t trail) IsLiteralTrue(l Literal) bool {
+func (t trail) IsLiteralTrue(l cnf.Literal) bool {
 	for _, e := range t {
 		if e.Lit == l {
 			return true

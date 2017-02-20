@@ -3,6 +3,8 @@ package sat
 import (
 	"fmt"
 	"testing"
+
+	"github.com/mitchellh/go-sat/cnf"
 )
 
 func TestSolve(t *testing.T) {
@@ -47,7 +49,7 @@ func TestSolve(t *testing.T) {
 
 	for i, tc := range cases {
 		t.Run(fmt.Sprintf("%d-%s", i, tc.Name), func(t *testing.T) {
-			actual := Solve(NewFormulaFromInts(tc.Formula))
+			actual := Solve(cnf.NewFormulaFromInts(tc.Formula))
 			if actual != tc.Result {
 				t.Fatalf("bad: %#v", actual)
 			}

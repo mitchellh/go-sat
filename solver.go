@@ -2,6 +2,8 @@ package sat
 
 import (
 	"log"
+
+	"github.com/mitchellh/go-sat/cnf"
 )
 
 var Trace = false
@@ -9,7 +11,7 @@ var Trace = false
 // Solve solves the given formula, returning ture on satisfiability and
 // false on unsatisfiability. This is just temporary. We'll return the
 // actual values for solving eventually.
-func Solve(f Formula) bool {
+func Solve(f cnf.Formula) bool {
 	if Trace {
 		log.Printf("[TRACE] sat: starting solver")
 	}
@@ -61,12 +63,12 @@ func Solve(f Formula) bool {
 	return false
 }
 
-func selectLiteral(vars map[Literal]struct{}, t trail) Literal {
-	tMap := map[Literal]struct{}{}
+func selectLiteral(vars map[cnf.Literal]struct{}, t trail) cnf.Literal {
+	tMap := map[cnf.Literal]struct{}{}
 	for _, e := range t {
 		lit := e.Lit
 		if lit < 0 {
-			lit = Literal(-int(lit))
+			lit = cnf.Literal(-int(lit))
 		}
 
 		tMap[lit] = struct{}{}
@@ -78,5 +80,5 @@ func selectLiteral(vars map[Literal]struct{}, t trail) Literal {
 		}
 	}
 
-	return Literal(0)
+	return cnf.Literal(0)
 }

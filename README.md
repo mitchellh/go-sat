@@ -39,3 +39,7 @@ standard `go get` and import paths. For example, the root `sat` package:
 
 If you find an issue with this library, please report an issue. If you'd like,
 we welcome any contributions. Fork this library and submit a pull request.
+
+SAT solving is an intensely competitive and fast-moving area of research. As
+advancements are made, I welcome any contributions or recommendations to
+improve this solver.

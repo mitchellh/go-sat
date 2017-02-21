@@ -11,6 +11,7 @@ import (
 
 	"github.com/mitchellh/go-sat/cnf"
 	"github.com/mitchellh/go-sat/dimacs"
+	testiface "github.com/mitchellh/go-testing-interface"
 )
 
 var flagSatlib = flag.Bool("satlib", false, "run ALL SATLIB tests (slow!)")
@@ -142,6 +143,10 @@ func satlibTestFile(t *testing.T, path string, expected bool) {
 	// Solve it
 	s := &Solver{
 		Formula: p.Formula,
+		/*
+			Trace:   true,
+			Tracer:  &testTracer{T: t},
+		*/
 	}
 
 	actual := s.Solve()
@@ -150,7 +155,7 @@ func satlibTestFile(t *testing.T, path string, expected bool) {
 	}
 }
 
-func satlibDirs(t *testing.T) []string {
+func satlibDirs(t testiface.T) []string {
 	base := filepath.Join("testdata", "satlib")
 	dir, err := os.Open(base)
 	defer dir.Close()

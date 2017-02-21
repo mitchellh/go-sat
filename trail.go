@@ -68,6 +68,37 @@ func (t *trail) Assert(l cnf.Literal, d bool) {
 	})
 }
 
+// IsUnit returns true if the clause c is a unit clause in t with
+// literal l. Clause c must be a clause within the formula that this
+// trail is being used for.
+func (t trail) IsUnit(c cnf.Clause, unitL cnf.Literal) bool {
+	m := map[cnf.Literal]struct{}{}
+	for _, e := range t {
+		m[e.Lit] = struct{}{}
+	}
+
+	// If we already have the unit literal we're looking for (+ or -),
+	// then this is not a unit clause
+	if _, ok := m[unitL]; ok {
+		return false
+	}
+	if _, ok := m[unitL.Negate()]; ok {
+		return false
+	}
+
+	for _, l := range c {
+		if l == unitL || l == unitL.Negate() {
+			continue
+		}
+
+		if _, ok := m[l.Negate()]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
 // IsFormulaFalse returns true if the given Formula f is false in the
 // current valuation (trail).
 func (t trail) IsFormulaFalse(f cnf.Formula) bool {

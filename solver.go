@@ -34,6 +34,9 @@ func (s *Solver) Solve() bool {
 
 	varsF := s.Formula.Vars()
 	for {
+		// Perform unit propagation
+		s.unitPropagate()
+
 		if s.m.IsFormulaFalse(s.Formula) {
 			if s.Trace {
 				s.Tracer.Printf("[TRACE] sat: current trail contains negated formula: %s", s.m)
@@ -75,6 +78,35 @@ func (s *Solver) Solve() bool {
 	}
 
 	return false
+}
+
+func (s *Solver) unitPropagate() {
+	for {
+		for _, c := range s.Formula {
+			for _, l := range c {
+				if s.m.IsUnit(c, l) {
+					if s.Trace {
+						s.Tracer.Printf(
+							"[TRACE] sat: found unit clause %v with literal %d in trail %s",
+							c, l, s.m)
+					}
+
+					s.m.Assert(l, false)
+					goto UNIT_REPEAT
+				}
+			}
+		}
+
+		// We didn't find a unit clause, close it out
+		return
+
+	UNIT_REPEAT:
+		// We found a unit clause but we have to check if we violated
+		// constraints in the trail.
+		if s.m.IsFormulaFalse(s.Formula) {
+			return
+		}
+	}
 }
 
 func selectLiteral(vars map[cnf.Literal]struct{}, t trail) cnf.Literal {

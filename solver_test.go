@@ -8,8 +8,6 @@ import (
 )
 
 func TestSolve(t *testing.T) {
-	Trace = true
-
 	cases := []struct {
 		Name    string
 		Formula [][]int
@@ -49,7 +47,12 @@ func TestSolve(t *testing.T) {
 
 	for i, tc := range cases {
 		t.Run(fmt.Sprintf("%d-%s", i, tc.Name), func(t *testing.T) {
-			actual := Solve(cnf.NewFormulaFromInts(tc.Formula))
+			s := &Solver{
+				Formula: cnf.NewFormulaFromInts(tc.Formula),
+				Trace:   true,
+			}
+
+			actual := s.Solve()
 			if actual != tc.Result {
 				t.Fatalf("bad: %#v", actual)
 			}

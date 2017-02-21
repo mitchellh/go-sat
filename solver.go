@@ -6,43 +6,50 @@ import (
 	"github.com/mitchellh/go-sat/cnf"
 )
 
-var Trace = false
+type Solver struct {
+	// Formula is the formula to be solved. Once solving has begun,
+	// this shouldn't be changed. If you want to change the formula,
+	// a new Solver should be allocated.
+	Formula cnf.Formula
 
-// Solve solves the given formula, returning ture on satisfiability and
-// false on unsatisfiability. This is just temporary. We'll return the
-// actual values for solving eventually.
-func Solve(f cnf.Formula) bool {
-	if Trace {
+	// Trace, if set to true, will output trace debugging information
+	// via the standard library `log` package.
+	Trace bool
+
+	m trail
+}
+
+// Solve finds a solution for the formula, returning true on satisfiability.
+func (s *Solver) Solve() bool {
+	if s.Trace {
 		log.Printf("[TRACE] sat: starting solver")
 	}
 
-	var m trail
-
-	varsF := f.Vars()
+	varsF := s.Formula.Vars()
 	for {
-		if m.IsFormulaFalse(f) {
-			if Trace {
-				log.Printf("[TRACE] sat: current trail contains negated formula: %s", m)
+		if s.m.IsFormulaFalse(s.Formula) {
+			if s.Trace {
+				log.Printf("[TRACE] sat: current trail contains negated formula: %s", s.m)
 			}
 
 			// If we have no more decisions within the trail, then we've
 			// failed finding a satisfying value.
-			if m.DecisionsLen() == 0 {
+			if s.m.DecisionsLen() == 0 {
 				return false
 			}
 
 			// Backtrack since we introduced an invalid literal
-			l := m.TrimToLastDecision().Negate()
-			if Trace {
-				log.Printf("[TRACE] sat: backtracking to %s, asserting %d", m, l)
+			l := s.m.TrimToLastDecision().Negate()
+			if s.Trace {
+				log.Printf("[TRACE] sat: backtracking to %s, asserting %d", s.m, l)
 			}
-			m.Assert(l, false)
+			s.m.Assert(l, false)
 		} else {
 			// If the trail contains the same number of elements as
 			// the variables in the formula, then we've found a satisfaction.
-			if len(m) == len(varsF) {
-				if Trace {
-					log.Printf("[TRACE] sat: solver found solution: %s", m)
+			if len(s.m) == len(varsF) {
+				if s.Trace {
+					log.Printf("[TRACE] sat: solver found solution: %s", s.m)
 				}
 
 				return true
@@ -50,13 +57,13 @@ func Solve(f cnf.Formula) bool {
 
 			// Choose a literal to assert. For now we naively just select
 			// the next literal.
-			lit := selectLiteral(varsF, m)
+			lit := selectLiteral(varsF, s.m)
 
-			if Trace {
+			if s.Trace {
 				log.Printf("[TRACE] sat: asserting: %d", lit)
 			}
 
-			m.Assert(lit, true)
+			s.m.Assert(lit, true)
 		}
 	}
 

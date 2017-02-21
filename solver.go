@@ -1,8 +1,6 @@
 package sat
 
 import (
-	"log"
-
 	"github.com/mitchellh/go-sat/cnf"
 )
 
@@ -13,8 +11,11 @@ type Solver struct {
 	Formula cnf.Formula
 
 	// Trace, if set to true, will output trace debugging information
-	// via the standard library `log` package.
-	Trace bool
+	// via the standard library `log` package. If true, Tracer must also
+	// be set to a non-nil value. The easiest implmentation is a logger
+	// created with log.NewLogger.
+	Trace  bool
+	Tracer Tracer
 
 	m trail
 }
@@ -22,14 +23,14 @@ type Solver struct {
 // Solve finds a solution for the formula, returning true on satisfiability.
 func (s *Solver) Solve() bool {
 	if s.Trace {
-		log.Printf("[TRACE] sat: starting solver")
+		s.Tracer.Printf("[TRACE] sat: starting solver")
 	}
 
 	varsF := s.Formula.Vars()
 	for {
 		if s.m.IsFormulaFalse(s.Formula) {
 			if s.Trace {
-				log.Printf("[TRACE] sat: current trail contains negated formula: %s", s.m)
+				s.Tracer.Printf("[TRACE] sat: current trail contains negated formula: %s", s.m)
 			}
 
 			// If we have no more decisions within the trail, then we've
@@ -41,7 +42,7 @@ func (s *Solver) Solve() bool {
 			// Backtrack since we introduced an invalid literal
 			l := s.m.TrimToLastDecision().Negate()
 			if s.Trace {
-				log.Printf("[TRACE] sat: backtracking to %s, asserting %d", s.m, l)
+				s.Tracer.Printf("[TRACE] sat: backtracking to %s, asserting %d", s.m, l)
 			}
 			s.m.Assert(l, false)
 		} else {
@@ -49,7 +50,7 @@ func (s *Solver) Solve() bool {
 			// the variables in the formula, then we've found a satisfaction.
 			if len(s.m) == len(varsF) {
 				if s.Trace {
-					log.Printf("[TRACE] sat: solver found solution: %s", s.m)
+					s.Tracer.Printf("[TRACE] sat: solver found solution: %s", s.m)
 				}
 
 				return true
@@ -60,7 +61,7 @@ func (s *Solver) Solve() bool {
 			lit := selectLiteral(varsF, s.m)
 
 			if s.Trace {
-				log.Printf("[TRACE] sat: asserting: %d", lit)
+				s.Tracer.Printf("[TRACE] sat: asserting: %d", lit)
 			}
 
 			s.m.Assert(lit, true)

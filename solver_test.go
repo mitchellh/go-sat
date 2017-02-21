@@ -50,6 +50,7 @@ func TestSolve(t *testing.T) {
 			s := &Solver{
 				Formula: cnf.NewFormulaFromInts(tc.Formula),
 				Trace:   true,
+				Tracer:  &testTracer{T: t},
 			}
 
 			actual := s.Solve()
@@ -58,4 +59,12 @@ func TestSolve(t *testing.T) {
 			}
 		})
 	}
+}
+
+type testTracer struct {
+	T *testing.T
+}
+
+func (t *testTracer) Printf(format string, v ...interface{}) {
+	t.T.Logf(format, v...)
 }

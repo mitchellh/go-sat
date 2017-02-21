@@ -4,6 +4,8 @@ import (
 	"github.com/mitchellh/go-sat/cnf"
 )
 
+// Solver is a SAT solver. This should be created manually with the
+// exported fields set as documented.
 type Solver struct {
 	// Formula is the formula to be solved. Once solving has begun,
 	// this shouldn't be changed. If you want to change the formula,
@@ -25,6 +27,10 @@ func (s *Solver) Solve() bool {
 	if s.Trace {
 		s.Tracer.Printf("[TRACE] sat: starting solver")
 	}
+
+	// Create a new empty trail
+	var newTrail trail
+	s.m = newTrail
 
 	varsF := s.Formula.Vars()
 	for {

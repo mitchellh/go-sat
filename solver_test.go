@@ -18,7 +18,7 @@ var flagSatlib = flag.Bool("satlib", false, "run ALL SATLIB tests (slow!)")
 // satlibThreshold is the number of satlib tests to run per category
 // when flagSatlib is NOT set. This can be increased as the efficiency of
 // the solver improves.
-const satlibThreshold = 1
+const satlibThreshold = 2
 
 func TestSolve(t *testing.T) {
 	cases := []struct {

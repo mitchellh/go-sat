@@ -9,17 +9,34 @@ import (
 
 // trail is the state of the solver that contains the list of literals
 // and their current value.
-type trail []trailElem
+type trail struct {
+	elems         []trailElem
+	set           map[cnf.Literal]struct{}
+	decisionLevel int
+	decisionLen   int
+}
 
 type trailElem struct {
 	Lit      cnf.Literal
 	Decision bool
 }
 
+func newTrail(cap int) *trail {
+	return &trail{
+		elems: make([]trailElem, 0, cap),
+		set:   make(map[cnf.Literal]struct{}),
+	}
+}
+
+// Len returns the number of variables are in the trail.
+func (t *trail) Len() int {
+	return len(t.elems)
+}
+
 // DecisionsLen returns the number of decision variables are in the trail.
-func (t trail) DecisionsLen() int {
+func (t *trail) DecisionsLen() int {
 	count := 0
-	for _, e := range t {
+	for _, e := range t.elems {
 		if e.Decision {
 			count++
 		}
@@ -32,22 +49,26 @@ func (t trail) DecisionsLen() int {
 // it) and returns the last decision literal.
 func (t *trail) TrimToLastDecision() cnf.Literal {
 	var i int
-	for i = len(*t) - 1; i >= 0; i-- {
-		if (*t)[i].Decision {
+	for i = len(t.elems) - 1; i >= 0; i-- {
+		if t.elems[i].Decision {
 			break
 		}
 	}
 
-	result := (*t)[i].Lit
-	*t = (*t)[:i]
+	for _, e := range t.elems[i:] {
+		delete(t.set, e.Lit)
+	}
+
+	result := t.elems[i].Lit
+	t.elems = t.elems[:i]
 	return result
 }
 
 // String returns human readable output for a trail that shows the
 // literals chosen. Decision literals are prefixed with '|'.
 func (t trail) String() string {
-	result := make([]string, len(t))
-	for i, e := range t {
+	result := make([]string, len(t.elems))
+	for i, e := range t.elems {
 		v := ""
 		if e.Decision {
 			v = "| "
@@ -62,20 +83,21 @@ func (t trail) String() string {
 
 // Assert adds the new literal to the trail.
 func (t *trail) Assert(l cnf.Literal, d bool) {
-	*t = append(*t, trailElem{
+	// Add it to the list
+	t.elems = append(t.elems, trailElem{
 		Lit:      l,
 		Decision: d,
 	})
+
+	// Store it in our set
+	t.set[l] = struct{}{}
 }
 
 // IsUnit returns true if the clause c is a unit clause in t with
 // literal l. Clause c must be a clause within the formula that this
 // trail is being used for.
-func (t trail) IsUnit(c cnf.Clause, unitL cnf.Literal) bool {
-	m := map[cnf.Literal]struct{}{}
-	for _, e := range t {
-		m[e.Lit] = struct{}{}
-	}
+func (t *trail) IsUnit(c cnf.Clause, unitL cnf.Literal) bool {
+	m := t.set
 
 	// If we already have the unit literal we're looking for (+ or -),
 	// then this is not a unit clause
@@ -99,25 +121,26 @@ func (t trail) IsUnit(c cnf.Clause, unitL cnf.Literal) bool {
 	return true
 }
 
-// IsFormulaFalse returns true if the given Formula f is false in the
-// current valuation (trail).
-func (t trail) IsFormulaFalse(f cnf.Formula) bool {
+// IsFormulaFalse returns a non-zero Clause if the given Formula f is
+// false in the current valuation (trail). This non-zero clause is a false
+// clause.
+func (t *trail) IsFormulaFalse(f cnf.Formula) cnf.Clause {
 	// If we have no trail, we can't contain the negated formula
-	if len(t) == 0 {
-		return false
+	if len(t.elems) == 0 {
+		return cnf.Clause(nil)
 	}
 
 	// We need to find ONE negated clause in f
 	for _, c := range f {
 		if t.IsClauseFalse(c) {
-			return true
+			return c
 		}
 	}
 
-	return false
+	return cnf.Clause(nil)
 }
 
-func (t trail) IsClauseFalse(c cnf.Clause) bool {
+func (t *trail) IsClauseFalse(c cnf.Clause) bool {
 	for _, l := range c {
 		if !t.IsLiteralFalse(l) {
 			return false
@@ -127,9 +150,9 @@ func (t trail) IsClauseFalse(c cnf.Clause) bool {
 	return true
 }
 
-func (t trail) IsLiteralFalse(l cnf.Literal) bool {
+func (t *trail) IsLiteralFalse(l cnf.Literal) bool {
 	l = l.Negate()
-	for _, e := range t {
+	for _, e := range t.elems {
 		if e.Lit == l {
 			return true
 		}
@@ -138,8 +161,8 @@ func (t trail) IsLiteralFalse(l cnf.Literal) bool {
 	return false
 }
 
-func (t trail) IsLiteralTrue(l cnf.Literal) bool {
-	for _, e := range t {
+func (t *trail) IsLiteralTrue(l cnf.Literal) bool {
+	for _, e := range t.elems {
 		if e.Lit == l {
 			return true
 		}

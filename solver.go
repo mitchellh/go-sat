@@ -19,7 +19,7 @@ type Solver struct {
 	Trace  bool
 	Tracer Tracer
 
-	m trail
+	m *trail
 }
 
 // Solve finds a solution for the formula, returning true on satisfiability.
@@ -28,16 +28,18 @@ func (s *Solver) Solve() bool {
 		s.Tracer.Printf("[TRACE] sat: starting solver")
 	}
 
-	// Create a new empty trail
-	var newTrail trail
-	s.m = newTrail
-
+	// Get the full list of vars
 	varsF := s.Formula.Vars()
+
+	// Create a new empty trail
+	s.m = newTrail(len(varsF))
+
 	for {
 		// Perform unit propagation
 		s.unitPropagate()
 
-		if s.m.IsFormulaFalse(s.Formula) {
+		conflictC := s.m.IsFormulaFalse(s.Formula)
+		if !conflictC.IsZero() {
 			if s.Trace {
 				s.Tracer.Printf("[TRACE] sat: current trail contains negated formula: %s", s.m)
 			}
@@ -57,7 +59,7 @@ func (s *Solver) Solve() bool {
 		} else {
 			// If the trail contains the same number of elements as
 			// the variables in the formula, then we've found a satisfaction.
-			if len(s.m) == len(varsF) {
+			if s.m.Len() == len(varsF) {
 				if s.Trace {
 					s.Tracer.Printf("[TRACE] sat: solver found solution: %s", s.m)
 				}
@@ -103,15 +105,15 @@ func (s *Solver) unitPropagate() {
 	UNIT_REPEAT:
 		// We found a unit clause but we have to check if we violated
 		// constraints in the trail.
-		if s.m.IsFormulaFalse(s.Formula) {
+		if !s.m.IsFormulaFalse(s.Formula).IsZero() {
 			return
 		}
 	}
 }
 
-func selectLiteral(vars map[cnf.Literal]struct{}, t trail) cnf.Literal {
+func selectLiteral(vars map[cnf.Literal]struct{}, t *trail) cnf.Literal {
 	tMap := map[cnf.Literal]struct{}{}
-	for _, e := range t {
+	for _, e := range t.elems {
 		lit := e.Lit
 		if lit < 0 {
 			lit = cnf.Literal(-int(lit))

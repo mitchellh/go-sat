@@ -71,6 +71,22 @@ func (f Formula) Vars() map[Literal]struct{} {
 	return set
 }
 
+// IsZero returns true of c represents the zero value.
+func (c Clause) IsZero() bool {
+	return c == nil
+}
+
+// Negate negates all the literals in C. The result is a clause that
+// is NOT equivalent to the original Clause.
+func (c Clause) Negate() Clause {
+	resultC := make([]Literal, len(c))
+	for j, l := range c {
+		resultC[j] = Literal(-int(l))
+	}
+
+	return Clause(resultC)
+}
+
 func (l Literal) Negate() Literal {
 	return Literal(int(l) * -1)
 }

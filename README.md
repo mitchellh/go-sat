@@ -17,7 +17,9 @@ solver:
 
   * [Unit propogation](https://en.wikipedia.org/wiki/Unit_propagation)
 
-  * ... more
+  * [Backjumping](https://en.wikipedia.org/wiki/Backjumping)
+
+  * [Clause Learning](https://en.wikipedia.org/wiki/Conflict-Driven_Clause_Learning)
 
 In addition to the solver, this library contains a number of sub-packages
 for working with SAT problems and formulas:

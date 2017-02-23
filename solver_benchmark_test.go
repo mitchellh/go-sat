@@ -35,6 +35,7 @@ func satlibBenchmarkDir(b *testing.B, dir string) {
 	}
 
 	// Go through each entry and attempt to solve each
+	count := 0
 	for _, entry := range entries {
 		// Ignore non-CNF files
 		if filepath.Ext(entry) != ".cnf" {
@@ -46,8 +47,11 @@ func satlibBenchmarkDir(b *testing.B, dir string) {
 			satlibBenchmarkFile(b, filepath.Join(dir, entry))
 		})
 
-		// Only run one benchmark for now
-		return
+		// Run only the threshold number
+		count++
+		if count >= satlibBenchThreshold {
+			return
+		}
 	}
 }
 

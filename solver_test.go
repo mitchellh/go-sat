@@ -19,23 +19,27 @@ var flagSatlib = flag.Bool("satlib", false, "run ALL SATLIB tests (slow!)")
 // satlibThreshold is the number of satlib tests to run per category
 // when flagSatlib is NOT set. This can be increased as the efficiency of
 // the solver improves.
-const satlibThreshold = 2
+const satlibThreshold = 3
+const satlibBenchThreshold = 2
 
 func TestSolve(t *testing.T) {
 	cases := []struct {
 		Name    string
 		Formula [][]int
+		Decide  []int
 		Result  bool
 	}{
 		{
 			"empty",
 			[][]int{},
+			nil,
 			true,
 		},
 
 		{
 			"single literal",
 			[][]int{[]int{4}},
+			nil,
 			true,
 		},
 
@@ -46,6 +50,7 @@ func TestSolve(t *testing.T) {
 				[]int{6},
 				[]int{-4, -6},
 			},
+			nil,
 			false,
 		},
 
@@ -55,6 +60,23 @@ func TestSolve(t *testing.T) {
 				[]int{-4},
 				[]int{4, -6},
 			},
+			nil,
+			true,
+		},
+
+		{
+			"more complex example",
+			[][]int{
+				[]int{-3, 4},
+				[]int{-1, -3, 5},
+				[]int{-2, -4, -5},
+				[]int{-2, 3, 5, -6},
+				[]int{-1, 2},
+				[]int{-1, 3, -5, -6},
+				[]int{1, -6},
+				[]int{1, 7},
+			},
+			[]int{6, 7, 3, 1, 7, 4},
 			true,
 		},
 	}
@@ -62,9 +84,10 @@ func TestSolve(t *testing.T) {
 	for i, tc := range cases {
 		t.Run(fmt.Sprintf("%d-%s", i, tc.Name), func(t *testing.T) {
 			s := &Solver{
-				Formula: cnf.NewFormulaFromInts(tc.Formula),
-				Trace:   true,
-				Tracer:  &testTracer{T: t},
+				Formula:        cnf.NewFormulaFromInts(tc.Formula),
+				Trace:          true,
+				Tracer:         &testTracer{T: t},
+				decideLiterals: tc.Decide,
 			}
 
 			actual := s.Solve()

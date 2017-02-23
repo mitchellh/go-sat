@@ -11,7 +11,7 @@ import (
 // and their current value.
 type trail struct {
 	elems       []trailElem
-	set         map[cnf.Literal]struct{}
+	set         map[cnf.Literal]int
 	decisionLen int
 }
 
@@ -23,7 +23,7 @@ type trailElem struct {
 func newTrail(cap int) *trail {
 	return &trail{
 		elems: make([]trailElem, 0, cap),
-		set:   make(map[cnf.Literal]struct{}),
+		set:   make(map[cnf.Literal]int),
 	}
 }
 
@@ -51,7 +51,7 @@ func (t *trail) Assert(l cnf.Literal, d bool) {
 	}
 
 	// Store it in our set
-	t.set[l] = struct{}{}
+	t.set[l] = t.decisionLen
 }
 
 // TrimToLastDecision trims the trail to the last decision (but not including
@@ -72,6 +72,53 @@ func (t *trail) TrimToLastDecision() cnf.Literal {
 	t.elems = t.elems[:i]
 	t.decisionLen--
 	return result
+}
+
+func (t *trail) TrimToLevel(level int) {
+	var i int
+	for i = len(t.elems) - 1; i >= 0; i-- {
+		if t.set[t.elems[i].Lit] <= level {
+			break
+		}
+	}
+
+	for _, e := range t.elems[i+1:] {
+		delete(t.set, e.Lit)
+	}
+
+	t.elems = t.elems[:i+1]
+	t.decisionLen = level
+}
+
+// LastAssertedLiteral returns the last asserted literal (decision or not)
+// from the clause c. "Last" is defined as most recent in the trail.
+func (t *trail) LastAssertedLiteral(c cnf.Clause) cnf.Literal {
+	for i := len(t.elems) - 1; i >= 0; i-- {
+		lit := t.elems[i].Lit
+		for _, l := range c {
+			if lit == l {
+				return lit
+			}
+		}
+	}
+
+	return cnf.Literal(0)
+}
+
+// Level returns the decision level that the given literal exists at.
+func (t *trail) Level(l cnf.Literal) int {
+	return t.set[l]
+}
+
+func (t *trail) MaxLevel(c cnf.Clause) int {
+	max := 0
+	for _, l := range c {
+		if v := t.set[l]; v > max {
+			max = v
+		}
+	}
+
+	return max
 }
 
 // String returns human readable output for a trail that shows the

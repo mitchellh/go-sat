@@ -32,6 +32,10 @@ func (t *trail) Len() int {
 	return len(t.elems)
 }
 
+func (t *trail) CurrentLevel() int {
+	return t.decisionLen
+}
+
 // DecisionsLen returns the number of decision variables are in the trail.
 func (t *trail) DecisionsLen() int {
 	return t.decisionLen

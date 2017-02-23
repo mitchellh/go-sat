@@ -26,10 +26,18 @@ type Solver struct {
 	// behavior being tested.
 	decideLiterals []int
 
+	//---------------------------------------------------------------
 	// Internal fields, do not set
+	//---------------------------------------------------------------
 	m         *trail
-	c, cNeg   cnf.Clause
 	reasonMap map[cnf.Literal]cnf.Clause
+
+	// conflict clause caching
+	c  cnf.Clause
+	cH map[cnf.Literal]struct{} // literals in C
+	cP map[cnf.Literal]struct{} // literals in lower decision levels of C
+	cL cnf.Literal              // last asserted literal in C
+	cN int                      // number of literals in the highest decision level of C
 }
 
 // Solve finds a solution for the formula, returning true on satisfiability.
@@ -62,8 +70,7 @@ func (s *Solver) Solve() bool {
 			}
 
 			// Set our conflict clause
-			s.c = conflictC
-			s.cNeg = s.c.Negate()
+			s.applyConflict(conflictC)
 
 			// If we have no more decisions within the trail, then we've
 			// failed finding a satisfying value.
@@ -78,16 +85,6 @@ func (s *Solver) Solve() bool {
 			}
 			f = append(f, s.c)
 			s.applyBackjump()
-
-			/*
-				// Backtrack since we introduced an invalid literal
-				l := s.m.TrimToLastDecision().Negate()
-				if s.Trace {
-					s.Tracer.Printf("[TRACE] sat: backtracking to %s, asserting %d", s.m, l)
-				}
-				s.m.Assert(l, false)
-				s.reasonMap[l] = s.c
-			*/
 		} else {
 			// If the trail contains the same number of elements as
 			// the variables in the formula, then we've found a satisfaction.
@@ -175,87 +172,115 @@ func (s *Solver) unitPropagate(f cnf.Formula) {
 	}
 }
 
+func (s *Solver) applyConflict(c cnf.Clause) {
+	// Build up our lookup caches for the conflict data to optimize
+	// the conflict learning process.
+	s.cH = make(map[cnf.Literal]struct{})
+	s.cP = make(map[cnf.Literal]struct{})
+	s.cN = 0
+	for _, l := range c {
+		s.addConflictLiteral(l)
+	}
+
+	// Find the last asserted literal using the cache
+	for i := len(s.m.elems) - 1; i >= 0; i-- {
+		s.cL = s.m.elems[i].Lit
+		if _, ok := s.cH[s.cL.Negate()]; ok {
+			break
+		}
+	}
+
+	if s.Trace {
+		s.Tracer.Printf(
+			"[TRACE] sat: applyConflict. cH = %v; cP = %v; cL = %d; cN = %d",
+			s.cH, s.cP, s.cL, s.cN)
+	}
+}
+
+func (s *Solver) addConflictLiteral(l cnf.Literal) {
+	if _, ok := s.cH[l]; !ok {
+		s.cH[l] = struct{}{}
+		if s.m.Level(l.Negate()) == s.m.CurrentLevel() {
+			s.cN++
+		} else {
+			s.cP[l] = struct{}{}
+		}
+	}
+}
+
+func (s *Solver) removeConflictLiteral(l cnf.Literal) {
+	delete(s.cH, l)
+
+	if s.m.Level(l.Negate()) == s.m.CurrentLevel() {
+		s.cN--
+	} else {
+		delete(s.cP, l)
+	}
+}
+
 func (s *Solver) applyExplain(lit cnf.Literal) {
-	litNeg := lit.Negate()
+	s.removeConflictLiteral(lit.Negate())
+
 	reason := s.reasonMap[lit]
+	for _, l := range reason {
+		if l != lit {
+			s.addConflictLiteral(l)
+		}
+	}
+
+	// Find the last asserted literal using the cache
+	for i := len(s.m.elems) - 1; i >= 0; i-- {
+		s.cL = s.m.elems[i].Lit
+		if _, ok := s.cH[s.cL.Negate()]; ok {
+			break
+		}
+	}
 
 	if s.Trace {
 		s.Tracer.Printf("[TRACE] sat: applyExplain: lit = %d, reason = %#v", lit, reason)
-	}
-
-	resultMap := make(map[cnf.Literal]struct{})
-	for _, l := range s.c {
-		if l != litNeg {
-			resultMap[l] = struct{}{}
-		}
-	}
-	for _, l := range reason {
-		if l != lit {
-			resultMap[l] = struct{}{}
-		}
-	}
-
-	result := make([]cnf.Literal, 0, len(resultMap))
-	for k, _ := range resultMap {
-		result = append(result, k)
-	}
-
-	s.c = cnf.Clause(result)
-	s.cNeg = s.c.Negate()
-
-	if s.Trace {
-		s.Tracer.Printf("[TRACE] sat: applyExplain: new C = %#v", s.c)
+		s.Tracer.Printf(
+			"[TRACE] sat: applyExplain. cH = %v; cP = %v; cL = %d; cN = %d",
+			s.cH, s.cP, s.cL, s.cN)
 	}
 }
 
 func (s *Solver) applyExplainUIP() {
-	for {
-		lit, isUIP := s.isUIP()
-		if isUIP {
-			return
-		}
-
-		s.applyExplain(lit)
+	for s.cN != 1 { // !isUIP
+		s.applyExplain(s.cL)
 	}
+
+	// buildC
+	c := make([]cnf.Literal, 0, len(s.cP)+1)
+	for l, _ := range s.cP {
+		c = append(c, l)
+	}
+	c = append(c, s.cL.Negate())
+	s.c = c
 }
 
-func (s *Solver) isUIP() (cnf.Literal, bool) {
-	lit := s.m.LastAssertedLiteral(s.cNeg)
-	litLevel := s.m.Level(lit)
-	for _, l := range s.cNeg {
-		// Literal must not equal the last asserted lit
-		if l == lit {
-			continue
-		}
-
-		// If these two literals at the same level, then it isn't a UIP
-		if s.m.Level(l) == litLevel {
-			return lit, false
-		}
-	}
-
-	return lit, true
+func (s *Solver) isUIP() bool {
+	return s.cN == 1
 }
 
 func (s *Solver) applyBackjump() {
-	lit := s.m.LastAssertedLiteral(s.cNeg)
-	c := make([]cnf.Literal, 0, len(s.cNeg))
-	for _, l := range s.cNeg {
-		if l != lit {
-			c = append(c, l)
+	level := 0
+	if len(s.cP) > 0 {
+		for l, _ := range s.cP {
+			if v := s.m.set[l.Negate()]; v > level {
+				level = v
+			}
 		}
 	}
 
-	level := s.m.MaxLevel(cnf.Clause(c))
 	if s.Trace {
 		s.Tracer.Printf(
 			"[TRACE] sat: backjump. C = %#v; l = %d; level = %d",
-			s.c, lit, level)
+			s.c, s.cL, level)
 	}
 
 	s.m.TrimToLevel(level)
 
-	lit = lit.Negate()
+	lit := s.cL.Negate()
 	s.m.Assert(lit, false)
 	s.reasonMap[lit] = s.c
 

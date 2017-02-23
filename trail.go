@@ -10,10 +10,9 @@ import (
 // trail is the state of the solver that contains the list of literals
 // and their current value.
 type trail struct {
-	elems         []trailElem
-	set           map[cnf.Literal]struct{}
-	decisionLevel int
-	decisionLen   int
+	elems       []trailElem
+	set         map[cnf.Literal]struct{}
+	decisionLen int
 }
 
 type trailElem struct {

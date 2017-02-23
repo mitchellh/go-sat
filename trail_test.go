@@ -80,8 +80,8 @@ func TestTrailIsUnit(t *testing.T) {
 	}
 }
 
-func testTrail(t *testing.T, in []int) trail {
-	var m trail
+func testTrail(t *testing.T, in []int) *trail {
+	m := newTrail(0)
 	for _, v := range in {
 		m.Assert(cnf.Literal(v), true)
 	}

@@ -35,14 +35,24 @@ func (t *trail) Len() int {
 
 // DecisionsLen returns the number of decision variables are in the trail.
 func (t *trail) DecisionsLen() int {
-	count := 0
-	for _, e := range t.elems {
-		if e.Decision {
-			count++
-		}
+	return t.decisionLen
+}
+
+// Assert adds the new literal to the trail.
+func (t *trail) Assert(l cnf.Literal, d bool) {
+	// Add it to the list
+	t.elems = append(t.elems, trailElem{
+		Lit:      l,
+		Decision: d,
+	})
+
+	// If this is a decision var, then incr our counter cache
+	if d {
+		t.decisionLen++
 	}
 
-	return count
+	// Store it in our set
+	t.set[l] = struct{}{}
 }
 
 // TrimToLastDecision trims the trail to the last decision (but not including
@@ -61,6 +71,7 @@ func (t *trail) TrimToLastDecision() cnf.Literal {
 
 	result := t.elems[i].Lit
 	t.elems = t.elems[:i]
+	t.decisionLen--
 	return result
 }
 
@@ -79,18 +90,6 @@ func (t trail) String() string {
 	}
 
 	return "[" + strings.Join(result, ", ") + "]"
-}
-
-// Assert adds the new literal to the trail.
-func (t *trail) Assert(l cnf.Literal, d bool) {
-	// Add it to the list
-	t.elems = append(t.elems, trailElem{
-		Lit:      l,
-		Decision: d,
-	})
-
-	// Store it in our set
-	t.set[l] = struct{}{}
 }
 
 // IsUnit returns true if the clause c is a unit clause in t with

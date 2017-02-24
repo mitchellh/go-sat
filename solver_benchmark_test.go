@@ -70,7 +70,8 @@ func satlibBenchmarkFile(b *testing.B, path string) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		s := &Solver{Formula: p.Formula}
+		s := New()
+		s.AddFormula(p.Formula)
 		s.Solve()
 	}
 }

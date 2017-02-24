@@ -20,9 +20,9 @@ type trailElem struct {
 	Decision bool
 }
 
-func newTrail(cap int) *trail {
+func newTrail() *trail {
 	return &trail{
-		elems: make([]trailElem, 0, cap),
+		elems: make([]trailElem, 0, 10),
 		set:   make(map[cnf.Literal]int),
 	}
 }

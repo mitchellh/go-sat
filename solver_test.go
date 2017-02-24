@@ -86,12 +86,11 @@ func TestSolve_table(t *testing.T) {
 
 	for i, tc := range cases {
 		t.Run(fmt.Sprintf("%d-%s", i, tc.Name), func(t *testing.T) {
-			s := &Solver{
-				Formula:        cnf.NewFormulaFromInts(tc.Formula),
-				Trace:          true,
-				Tracer:         newTracer(t),
-				decideLiterals: tc.Decide,
-			}
+			s := New()
+			s.Trace = true
+			s.Tracer = newTracer(t)
+			s.decideLiterals = tc.Decide
+			s.AddFormula(cnf.NewFormulaFromInts(tc.Formula))
 
 			actual := s.Solve()
 			if actual != tc.Result {
@@ -167,13 +166,12 @@ func satlibTestFile(t *testing.T, path string, expected bool) {
 	}
 
 	// Solve it
-	s := &Solver{
-		Formula: p.Formula,
-		/*
-			Trace:   true,
-			Tracer:  &testTracer{T: t},
-		*/
-	}
+	s := New()
+	/*
+		Trace:   true,
+		Tracer:  &testTracer{T: t},
+	*/
+	s.AddFormula(p.Formula)
 
 	actual := s.Solve()
 	if actual != expected {

@@ -9,20 +9,15 @@ import (
 type satResult byte
 
 const (
-	satResultInvalid satResult = iota
-	satResultUndef
+	satResultUndef satResult = iota
 	satResultUnsat
 	satResultSat
 )
 
-// Solver is a SAT solver. This should be created manually with the
-// exported fields set as documented.
+// Solver is a SAT solver. This should be created with New to get
+// the proper internal memory allocations. Using a manually allocated
+// Solver will probably crash.
 type Solver struct {
-	// Formula is the formula to be solved. Once solving has begun,
-	// this shouldn't be changed. If you want to change the formula,
-	// a new Solver should be allocated.
-	Formula cnf.Formula
-
 	// Trace, if set to true, will output trace debugging information
 	// via the standard library `log` package. If true, Tracer must also
 	// be set to a non-nil value. The easiest implmentation is a logger
@@ -52,42 +47,34 @@ type Solver struct {
 	cN int                      // number of literals in the highest decision level of C
 }
 
+// New creates a new solver and allocates the basics for it.
+func New() *Solver {
+	return &Solver{
+		m:         newTrail(),
+		reasonMap: make(map[cnf.Literal]cnf.Clause),
+	}
+}
+
 // Solve finds a solution for the formula, returning true on satisfiability.
 func (s *Solver) Solve() bool {
 	if s.Trace {
-		s.Tracer.Printf("[TRACE] sat: starting solver")
+		s.Tracer.Printf("[TRACE] sat: starting solve()")
 	}
 
-	// Initialize our state
-	s.result = satResultUndef
-
-	// Get the full list of vars
-	totalVars := len(s.Formula.Vars())
-
-	// Create a new empty trail
-	s.reasonMap = make(map[cnf.Literal]cnf.Clause)
-	s.m = newTrail(totalVars)
-
-	// Initialize our formula. We initially make it at least as large as
-	// the number of clauses in our original formula.
-	if s.f == nil {
-		s.f = make([]cnf.Clause, 0, len(s.Formula))
-	} else {
-		s.f = s.f[:0]
-	}
-
-	// Add all the clauses from the original formula
-	for _, c := range s.Formula {
-		s.addClause(c)
-
-		// addClause can cause immediate failure for empty clauses. Check.
-		if s.result != satResultUndef {
-			return s.result == satResultSat
+	// Check the result. This can be set already by a prior call to Solve
+	// or via the AddClause process.
+	if s.result != satResultUndef {
+		if s.Trace {
+			s.Tracer.Printf(
+				"[TRACE] sat: result is already available: %s", s.result)
 		}
+
+		return s.result == satResultSat
 	}
 
 	// Available vars to set
 	varsF := s.f.Vars()
+	totalVars := len(varsF) + s.m.Len()
 
 	for {
 		// Perform unit propagation
@@ -142,81 +129,6 @@ func (s *Solver) Solve() bool {
 	}
 
 	return false
-}
-
-func (s *Solver) addClause(c cnf.Clause) {
-	ls := make(map[cnf.Literal]struct{})
-	for _, l := range c {
-		// If this literal is already false in the trail, then don't add
-		if s.m.IsLiteralFalse(l) {
-			if s.Trace {
-				s.Tracer.Printf(
-					"[TRACE] sat: addClause: not adding literal; literal %d false: %#v",
-					l, c)
-			}
-
-			continue
-		}
-
-		// If the literal is already true, we don't add the clause at all
-		if s.m.IsLiteralTrue(l) {
-			if s.Trace {
-				s.Tracer.Printf(
-					"[TRACE] sat: addClause: not adding clause; literal %d already true: %#v",
-					l, c)
-			}
-
-			return
-		}
-
-		// If the clause contains both a positive and negative it is
-		// tautological.
-		if _, ok := ls[l.Negate()]; ok {
-			if s.Trace {
-				s.Tracer.Printf("[TRACE] sat: addClause: not adding clause; tautology: %#v", c)
-			}
-
-			return
-		}
-
-		// Add the literal. This will also remove duplicates
-		ls[l] = struct{}{}
-	}
-
-	if len(ls) == 0 {
-		if s.Trace {
-			s.Tracer.Printf("[TRACE] sat: addClause: empty clause, forcing unsat")
-		}
-
-		s.result = satResultUnsat
-		return
-	}
-
-	// If this is a single literal clause then we assert it cause it must be
-	if len(ls) == 1 {
-		for l, _ := range ls {
-			if s.Trace {
-				s.Tracer.Printf("[TRACE] sat: addClause: single literal clause, asserting %d", l)
-			}
-
-			s.assertLiteral(l, false)
-			s.reasonMap[l] = c
-
-			// Do unit propagation since this may solve already clauses
-			s.unitPropagate()
-		}
-
-		// We also don't add this clause since we just asserted the value
-		return
-	}
-
-	// Add it to our formula
-	c = make([]cnf.Literal, 0, len(ls))
-	for l, _ := range ls {
-		c = append(c, cnf.Literal(l))
-	}
-
-	s.f = append(s.f, c)
 }
 
 func (s *Solver) assertLiteral(l cnf.Literal, d bool) {
@@ -282,7 +194,7 @@ func (s *Solver) unitPropagate() {
 	UNIT_REPEAT:
 		// We found a unit clause but we have to check if we violated
 		// constraints in the trail.
-		if !s.m.IsFormulaFalse(s.Formula).IsZero() {
+		if !s.m.IsFormulaFalse(s.f).IsZero() {
 			return
 		}
 	}

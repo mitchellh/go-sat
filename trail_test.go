@@ -116,7 +116,7 @@ func TestTrailTrimToLevel(t *testing.T) {
 }
 
 func testTrail(t *testing.T, in []int) *trail {
-	m := newTrail(0)
+	m := newTrail()
 	for _, v := range in {
 		decision := false
 		if v > 100 {

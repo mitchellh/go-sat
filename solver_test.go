@@ -14,7 +14,10 @@ import (
 	testiface "github.com/mitchellh/go-testing-interface"
 )
 
-var flagSatlib = flag.Bool("satlib", false, "run ALL SATLIB tests (slow!)")
+var (
+	flagImmediate = flag.Bool("immediate", false, "log output immediately")
+	flagSatlib    = flag.Bool("satlib", false, "run ALL SATLIB tests (slow!)")
+)
 
 // satlibThreshold is the number of satlib tests to run per category
 // when flagSatlib is NOT set. This can be increased as the efficiency of
@@ -22,7 +25,7 @@ var flagSatlib = flag.Bool("satlib", false, "run ALL SATLIB tests (slow!)")
 const satlibThreshold = 15
 const satlibBenchThreshold = 10
 
-func TestSolve(t *testing.T) {
+func TestSolve_table(t *testing.T) {
 	cases := []struct {
 		Name    string
 		Formula [][]int
@@ -86,7 +89,7 @@ func TestSolve(t *testing.T) {
 			s := &Solver{
 				Formula:        cnf.NewFormulaFromInts(tc.Formula),
 				Trace:          true,
-				Tracer:         &testTracer{T: t},
+				Tracer:         newTracer(t),
 				decideLiterals: tc.Decide,
 			}
 
@@ -210,6 +213,14 @@ func satlibDirs(t testiface.T) []string {
 	return tests
 }
 
+func newTracer(t *testing.T) Tracer {
+	if *flagImmediate {
+		return &immediateTracer{}
+	} else {
+		return &testTracer{T: t}
+	}
+}
+
 // testTracer is a Tracer implementation that sends output to the test logger.
 type testTracer struct {
 	T *testing.T
@@ -217,4 +228,12 @@ type testTracer struct {
 
 func (t *testTracer) Printf(format string, v ...interface{}) {
 	t.T.Logf(format, v...)
+}
+
+// immediateTracer is a Tracer implementation that sends output to stdout
+// so it is shown immediately on -v. Enabled with -immediate.
+type immediateTracer struct{}
+
+func (t *immediateTracer) Printf(format string, v ...interface{}) {
+	fmt.Printf(format+"\n", v...)
 }

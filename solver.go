@@ -6,6 +6,15 @@ import (
 	"github.com/mitchellh/go-sat/cnf"
 )
 
+type satResult byte
+
+const (
+	satResultInvalid satResult = iota
+	satResultUndef
+	satResultUnsat
+	satResultSat
+)
+
 // Solver is a SAT solver. This should be created manually with the
 // exported fields set as documented.
 type Solver struct {
@@ -29,6 +38,9 @@ type Solver struct {
 	//---------------------------------------------------------------
 	// Internal fields, do not set
 	//---------------------------------------------------------------
+	result satResult
+
+	f         cnf.Formula // formula we're solving
 	m         *trail
 	reasonMap map[cnf.Literal]cnf.Clause
 
@@ -46,23 +58,42 @@ func (s *Solver) Solve() bool {
 		s.Tracer.Printf("[TRACE] sat: starting solver")
 	}
 
+	// Initialize our state
+	s.result = satResultUndef
+
 	// Get the full list of vars
-	varsF := s.Formula.Vars()
+	totalVars := len(s.Formula.Vars())
 
 	// Create a new empty trail
 	s.reasonMap = make(map[cnf.Literal]cnf.Clause)
-	s.m = newTrail(len(varsF))
+	s.m = newTrail(totalVars)
 
-	// Copy f that will hold our learned clauses
-	fCopy := make([]cnf.Clause, len(s.Formula))
-	copy(fCopy, s.Formula)
-	f := cnf.Formula(fCopy)
+	// Initialize our formula. We initially make it at least as large as
+	// the number of clauses in our original formula.
+	if s.f == nil {
+		s.f = make([]cnf.Clause, 0, len(s.Formula))
+	} else {
+		s.f = s.f[:0]
+	}
+
+	// Add all the clauses from the original formula
+	for _, c := range s.Formula {
+		s.addClause(c)
+
+		// addClause can cause immediate failure for empty clauses. Check.
+		if s.result != satResultUndef {
+			return s.result == satResultSat
+		}
+	}
+
+	// Available vars to set
+	varsF := s.f.Vars()
 
 	for {
 		// Perform unit propagation
-		s.unitPropagate(f)
+		s.unitPropagate()
 
-		conflictC := s.m.IsFormulaFalse(f)
+		conflictC := s.m.IsFormulaFalse(s.f)
 		if !conflictC.IsZero() {
 			if s.Trace {
 				s.Tracer.Printf("[TRACE] sat: current trail contains negated formula: %s", s.m)
@@ -80,15 +111,17 @@ func (s *Solver) Solve() bool {
 
 			// Explain to learn our conflict clause
 			s.applyExplainUIP()
-			if s.Trace {
-				s.Tracer.Printf("[TRACE] sat: learned clause: %#v", s.c)
+			if len(s.c) > 1 {
+				if s.Trace {
+					s.Tracer.Printf("[TRACE] sat: learned clause: %#v", s.c)
+				}
+				s.f = append(s.f, s.c)
 			}
-			f = append(f, s.c)
 			s.applyBackjump()
 		} else {
 			// If the trail contains the same number of elements as
 			// the variables in the formula, then we've found a satisfaction.
-			if s.m.Len() == len(varsF) {
+			if s.m.Len() == totalVars {
 				if s.Trace {
 					s.Tracer.Printf("[TRACE] sat: solver found solution: %s", s.m)
 				}
@@ -109,6 +142,81 @@ func (s *Solver) Solve() bool {
 	}
 
 	return false
+}
+
+func (s *Solver) addClause(c cnf.Clause) {
+	ls := make(map[cnf.Literal]struct{})
+	for _, l := range c {
+		// If this literal is already false in the trail, then don't add
+		if s.m.IsLiteralFalse(l) {
+			if s.Trace {
+				s.Tracer.Printf(
+					"[TRACE] sat: addClause: not adding literal; literal %d false: %#v",
+					l, c)
+			}
+
+			continue
+		}
+
+		// If the literal is already true, we don't add the clause at all
+		if s.m.IsLiteralTrue(l) {
+			if s.Trace {
+				s.Tracer.Printf(
+					"[TRACE] sat: addClause: not adding clause; literal %d already true: %#v",
+					l, c)
+			}
+
+			return
+		}
+
+		// If the clause contains both a positive and negative it is
+		// tautological.
+		if _, ok := ls[l.Negate()]; ok {
+			if s.Trace {
+				s.Tracer.Printf("[TRACE] sat: addClause: not adding clause; tautology: %#v", c)
+			}
+
+			return
+		}
+
+		// Add the literal. This will also remove duplicates
+		ls[l] = struct{}{}
+	}
+
+	if len(ls) == 0 {
+		if s.Trace {
+			s.Tracer.Printf("[TRACE] sat: addClause: empty clause, forcing unsat")
+		}
+
+		s.result = satResultUnsat
+		return
+	}
+
+	// If this is a single literal clause then we assert it cause it must be
+	if len(ls) == 1 {
+		for l, _ := range ls {
+			if s.Trace {
+				s.Tracer.Printf("[TRACE] sat: addClause: single literal clause, asserting %d", l)
+			}
+
+			s.m.Assert(l, false)
+			s.reasonMap[l] = c
+
+			// Do unit propagation since this may solve already clauses
+			s.unitPropagate()
+		}
+
+		// We also don't add this clause since we just asserted the value
+		return
+	}
+
+	// Add it to our formula
+	c = make([]cnf.Literal, 0, len(ls))
+	for l, _ := range ls {
+		c = append(c, cnf.Literal(l))
+	}
+
+	s.f = append(s.f, c)
 }
 
 func (s *Solver) selectLiteral(vars map[cnf.Literal]struct{}) cnf.Literal {
@@ -142,9 +250,13 @@ func (s *Solver) selectLiteral(vars map[cnf.Literal]struct{}) cnf.Literal {
 	return cnf.Literal(0)
 }
 
-func (s *Solver) unitPropagate(f cnf.Formula) {
+//-------------------------------------------------------------------
+// Unit Propagation
+//-------------------------------------------------------------------
+
+func (s *Solver) unitPropagate() {
 	for {
-		for _, c := range f {
+		for _, c := range s.f {
 			for _, l := range c {
 				if s.m.IsUnit(c, l) {
 					if s.Trace {
@@ -171,6 +283,10 @@ func (s *Solver) unitPropagate(f cnf.Formula) {
 		}
 	}
 }
+
+//-------------------------------------------------------------------
+// Conflict Clause Learning
+//-------------------------------------------------------------------
 
 func (s *Solver) applyConflict(c cnf.Clause) {
 	// Build up our lookup caches for the conflict data to optimize
@@ -199,11 +315,14 @@ func (s *Solver) applyConflict(c cnf.Clause) {
 
 func (s *Solver) addConflictLiteral(l cnf.Literal) {
 	if _, ok := s.cH[l]; !ok {
-		s.cH[l] = struct{}{}
-		if s.m.Level(l.Negate()) == s.m.CurrentLevel() {
-			s.cN++
-		} else {
-			s.cP[l] = struct{}{}
+		level := s.m.Level(l.Negate())
+		if level > 0 {
+			s.cH[l] = struct{}{}
+			if level == s.m.CurrentLevel() {
+				s.cN++
+			} else {
+				s.cP[l] = struct{}{}
+			}
 		}
 	}
 }
@@ -261,6 +380,10 @@ func (s *Solver) applyExplainUIP() {
 func (s *Solver) isUIP() bool {
 	return s.cN == 1
 }
+
+//-------------------------------------------------------------------
+// Backjumping
+//-------------------------------------------------------------------
 
 func (s *Solver) applyBackjump() {
 	level := 0

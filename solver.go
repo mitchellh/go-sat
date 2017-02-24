@@ -137,7 +137,7 @@ func (s *Solver) Solve() bool {
 				s.Tracer.Printf("[TRACE] sat: assert: %d (decision)", lit)
 			}
 
-			s.m.Assert(lit, true)
+			s.assertLiteral(lit, true)
 		}
 	}
 
@@ -199,7 +199,7 @@ func (s *Solver) addClause(c cnf.Clause) {
 				s.Tracer.Printf("[TRACE] sat: addClause: single literal clause, asserting %d", l)
 			}
 
-			s.m.Assert(l, false)
+			s.assertLiteral(l, false)
 			s.reasonMap[l] = c
 
 			// Do unit propagation since this may solve already clauses
@@ -217,6 +217,10 @@ func (s *Solver) addClause(c cnf.Clause) {
 	}
 
 	s.f = append(s.f, c)
+}
+
+func (s *Solver) assertLiteral(l cnf.Literal, d bool) {
+	s.m.Assert(l, d)
 }
 
 func (s *Solver) selectLiteral(vars map[cnf.Literal]struct{}) cnf.Literal {
@@ -265,7 +269,7 @@ func (s *Solver) unitPropagate() {
 							c, l, s.m)
 					}
 
-					s.m.Assert(l, false)
+					s.assertLiteral(l, false)
 					s.reasonMap[l] = c
 					goto UNIT_REPEAT
 				}
@@ -404,7 +408,7 @@ func (s *Solver) applyBackjump() {
 	s.m.TrimToLevel(level)
 
 	lit := s.cL.Negate()
-	s.m.Assert(lit, false)
+	s.assertLiteral(lit, false)
 	s.reasonMap[lit] = s.c
 
 	if s.Trace {

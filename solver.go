@@ -1,8 +1,6 @@
 package sat
 
 import (
-	"fmt"
-
 	"github.com/mitchellh/go-sat/cnf"
 	"github.com/mitchellh/go-sat/packed"
 )
@@ -127,9 +125,12 @@ func (s *Solver) Solve() bool {
 			}
 			s.applyBackjump()
 		} else {
-			// If the trail contains the same number of elements as
-			// the variables in the formula, then we've found a satisfaction.
-			if len(s.trail) == len(s.vars) {
+			// Choose a literal to assert.
+			lit := s.selectLiteral()
+
+			// If it is undef it means there are no more literals which means
+			// we have solved the formula
+			if lit == packed.LitUndef {
 				if s.Trace {
 					s.Tracer.Printf("[TRACE] sat: solver found solution: %#v", s.trail)
 				}
@@ -137,38 +138,25 @@ func (s *Solver) Solve() bool {
 				return true
 			}
 
-			// Choose a literal to assert. For now we naively just select
-			// the next literal.
-			lit := s.selectLiteral()
 			if s.Trace {
-				s.Tracer.Printf("[TRACE] sat: assert: %d (decision)", lit)
+				s.Tracer.Printf("[TRACE] sat: assert: %s (decision)", lit)
 			}
-			s.assertLiteral(lit, true)
+			s.newDecisionLevel()
+			s.assertLiteral(lit)
 		}
 	}
 
 	return false
 }
 
-func (s *Solver) selectLiteral() cnf.Literal {
-	if len(s.decideLiterals) > 0 {
-		result := cnf.Literal(s.decideLiterals[0])
-		s.decideLiterals = s.decideLiterals[1:]
-
-		if _, ok := s.assigns[int(result)]; ok {
-			panic(fmt.Sprintf("decideLiteral taken: %d", result))
-		}
-
-		return result
-	}
-
+func (s *Solver) selectLiteral() packed.Lit {
 	for raw, _ := range s.vars {
 		if _, ok := s.assigns[raw]; !ok {
-			return cnf.Literal(raw)
+			return packed.NewLit(raw, false)
 		}
 	}
 
-	return cnf.Literal(0)
+	return packed.LitUndef
 }
 
 //-------------------------------------------------------------------
@@ -186,7 +174,7 @@ func (s *Solver) unitPropagate() {
 							c, l, s.trail)
 					}
 
-					s.assertLiteral(l, false)
+					s.assertLiteral(l.Pack())
 					s.reasonMap[l] = c
 					goto UNIT_REPEAT
 				}
@@ -325,7 +313,7 @@ func (s *Solver) applyBackjump() {
 	s.trimToDecisionLevel(level)
 
 	lit := s.cL.Negate()
-	s.assertLiteral(lit, false)
+	s.assertLiteral(lit.Pack())
 	s.reasonMap[lit] = s.c
 
 	if s.Trace {

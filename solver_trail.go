@@ -23,18 +23,12 @@ func (s *Solver) ValueLit(l packed.Lit) Tribool {
 	return result
 }
 
-func (s *Solver) assertLiteral(l cnf.Literal, d bool) {
-	// If this is a decision literal, then create a new decision level
-	if d {
-		s.newDecisionLevel()
-	}
-
+func (s *Solver) assertLiteral(l packed.Lit) {
 	// Store the literal in the trail
-	pl := l.Pack()
-	v := pl.Var()
-	s.assigns[v] = BoolToTri(!pl.Sign())
+	v := l.Var()
+	s.assigns[v] = BoolToTri(!l.Sign())
 	s.varinfo[v] = varinfo{level: s.decisionLevel()}
-	s.trail = append(s.trail, pl)
+	s.trail = append(s.trail, l)
 }
 
 // level returns the level for the variable specified by v. This variable

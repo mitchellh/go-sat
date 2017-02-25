@@ -106,7 +106,7 @@ func (s *Solver) AddClause(c *packed.Clause) {
 			s.Tracer.Printf("[TRACE] sat: addClause: single literal clause, asserting %d", l)
 		}
 
-		s.assertLiteral(l, false)
+		s.assertLiteral(lits[0])
 		s.reasonMap[l] = cnfC
 
 		// Do unit propagation since this may solve already clauses

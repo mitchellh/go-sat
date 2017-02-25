@@ -43,7 +43,7 @@ func TestSolverValueLit(t *testing.T) {
 	for i, tc := range cases {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			s := New()
-			s.assertLiteral(cnf.Literal(tc.Assert), false)
+			s.assertLiteral(packed.NewLitInt(tc.Assert))
 
 			l := packed.NewLitInt(tc.Lit)
 			result := s.ValueLit(l)
@@ -115,7 +115,7 @@ func TestSolverIsUnit(t *testing.T) {
 		t.Run(fmt.Sprintf("%d-%s", i, tc.Name), func(t *testing.T) {
 			s := New()
 			for _, l := range tc.Input {
-				s.assertLiteral(cnf.Literal(l), false)
+				s.assertLiteral(packed.NewLitInt(l))
 			}
 
 			c := make([]cnf.Literal, len(tc.Clause))
@@ -160,7 +160,11 @@ func TestSolverTrimToDecisionLevel(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			s := New()
 			for _, l := range tc.Assert {
-				s.assertLiteral(cnf.Literal(l), l < 0)
+				if l < 0 {
+					s.newDecisionLevel()
+				}
+
+				s.assertLiteral(packed.NewLitInt(l))
 			}
 
 			s.trimToDecisionLevel(tc.Level)

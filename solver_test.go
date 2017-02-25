@@ -79,7 +79,7 @@ func TestSolve_table(t *testing.T) {
 				[]int{1, -6},
 				[]int{1, 7},
 			},
-			[]int{6, 7, 3, 1, 7, 4},
+			nil,
 			true,
 		},
 	}

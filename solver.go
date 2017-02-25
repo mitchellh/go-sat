@@ -7,14 +7,6 @@ import (
 	"github.com/mitchellh/go-sat/packed"
 )
 
-type satResult byte
-
-const (
-	satResultUndef satResult = iota
-	satResultUnsat
-	satResultSat
-)
-
 // Solver is a SAT solver. This should be created with New to get
 // the proper internal memory allocations. Using a manually allocated
 // Solver will probably crash.
@@ -43,18 +35,33 @@ type Solver struct {
 	clauses []packed.Clause  // clauses to solve
 	vars    map[int]struct{} // list of available vars
 
-	// trail
-	assigns  map[int]Tribool // var assignments
-	varinfo  map[int]varinfo // var info
-	trail    []packed.Lit    // actual trail
-	trailIdx []int           // indices of different decision levels in trail
-
 	// conflict clause caching
 	c  cnf.Clause
 	cH map[cnf.Literal]struct{} // literals in C
 	cP map[cnf.Literal]struct{} // literals in lower decision levels of C
 	cL cnf.Literal              // last asserted literal in C
 	cN int                      // number of literals in the highest decision level of C
+
+	//---------------------------------------------------------------
+	// trail
+	//---------------------------------------------------------------
+
+	// trail is the actual trail of assigned literals. The value assigned
+	// is in the assigns map.
+	trail []packed.Lit
+
+	// trailIdx keeps track of the indices for new decision levels.
+	// trailIdx[level] = index to the start of that level in trail
+	trailIdx []int
+
+	// assigns keeps track of variable assignment values. unassigned variables
+	// are never present in assigns.
+	assigns map[int]Tribool
+
+	// varinfo holds information about an assigned variable. unassigned
+	// variables may be present here but their resulting information is
+	// garbage.
+	varinfo map[int]varinfo
 }
 
 // New creates a new solver and allocates the basics for it.
@@ -324,4 +331,37 @@ func (s *Solver) applyBackjump() {
 	if s.Trace {
 		s.Tracer.Printf("[TRACE] sat: backjump. M = %#v", s.trail)
 	}
+}
+
+//-------------------------------------------------------------------
+// Private types
+//-------------------------------------------------------------------
+
+type satResult byte
+
+const (
+	satResultUndef satResult = iota
+	satResultUnsat
+	satResultSat
+)
+
+type varinfo struct {
+	level int
+}
+
+// Tribool is a tri-state boolean with undefined as the 3rd state.
+type Tribool uint8
+
+const (
+	True  Tribool = 0
+	False         = 1
+	Undef         = 2
+)
+
+func BoolToTri(b bool) Tribool {
+	if b {
+		return True
+	}
+
+	return False
 }

@@ -18,11 +18,11 @@ func (s *Solver) AddFormula(f packed.Formula) {
 // AddClause adds a Clause to solve to the solver.
 //
 // This can only be called before Solve() is called.
-func (s *Solver) AddClause(c *packed.Clause) {
+func (s *Solver) AddClause(c packed.Clause) {
 	// Get the actual slice since we'll be modifying this directly.
 	// The API docs say not to but its part of our package and we know
 	// what we're doing. :)
-	lits := c.Lits()
+	lits := c
 
 	// Sort
 	sort.Slice(lits, func(i, j int) bool {
@@ -92,9 +92,6 @@ func (s *Solver) AddClause(c *packed.Clause) {
 		return
 	}
 
-	// Update literals since we're for sure using this clause
-	c.SetLits(lits)
-
 	// Track the available decision variables
 	for _, l := range lits {
 		s.vars[l.Var()] = struct{}{}
@@ -116,6 +113,7 @@ func (s *Solver) AddClause(c *packed.Clause) {
 	}
 
 	// Add it to our formula
+	c = packed.Clause(lits)
 	s.clauses = append(s.clauses, c)
 	s.watchClause(c)
 }

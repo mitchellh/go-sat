@@ -26,7 +26,7 @@ type Solver struct {
 	result satResult
 
 	// problem
-	clauses []*packed.Clause // clauses to solve
+	clauses []packed.Clause  // clauses to solve
 	vars    map[int]struct{} // list of available vars
 
 	// two-literal watching
@@ -124,7 +124,7 @@ func (s *Solver) Solve() bool {
 			}
 
 			// Add our learned clause
-			lits := learnt.Lits()
+			lits := learnt
 			if s.Trace {
 				s.Tracer.Printf(
 					"[TRACE] sat: asserting learned literal: %s", lits[0])
@@ -132,8 +132,7 @@ func (s *Solver) Solve() bool {
 			if len(lits) == 1 {
 				s.assertLiteral(lits[0], nil)
 			} else {
-				c := packed.NewClause(0)
-				c.SetLits(lits)
+				c := packed.Clause(lits)
 				s.clauses = append(s.clauses, c)
 				s.watchClause(c)
 				s.assertLiteral(lits[0], c)
@@ -186,7 +185,7 @@ const (
 )
 
 type varinfo struct {
-	reason *packed.Clause
+	reason packed.Clause
 	level  int
 }
 

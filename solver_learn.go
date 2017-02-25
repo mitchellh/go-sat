@@ -4,7 +4,7 @@ import (
 	"github.com/mitchellh/go-sat/packed"
 )
 
-func (s *Solver) learn(c *packed.Clause) (*packed.Clause, int) {
+func (s *Solver) learn(c packed.Clause) (packed.Clause, int) {
 	// Determine our learned clause
 	pathC := 0
 	p := packed.LitUndef
@@ -16,9 +16,8 @@ func (s *Solver) learn(c *packed.Clause) (*packed.Clause, int) {
 			j = 1
 		}
 
-		lits := c.Lits()
-		for ; j < len(lits); j++ {
-			q := lits[j]
+		for ; j < len(c); j++ {
+			q := c[j]
 			qVar := q.Var()
 			qLevel := s.level(qVar)
 			if s.seen[qVar] == 0 && qLevel > 0 {
@@ -52,15 +51,16 @@ func (s *Solver) learn(c *packed.Clause) (*packed.Clause, int) {
 	backjumpLevel := 0
 	if len(learnt) > 1 {
 		maxI := 1
+		maxLevel := s.level(learnt[maxI].Var())
 		for i := 2; i < len(learnt); i++ {
-			if s.level(learnt[i].Var()) > s.level(learnt[maxI].Var()) {
+			if l := s.level(learnt[i].Var()); l > maxLevel {
 				maxI = i
+				maxLevel = l
 			}
 		}
 
-		p := learnt[maxI]
 		learnt[maxI], learnt[1] = learnt[1], learnt[maxI]
-		backjumpLevel = s.level(p.Var())
+		backjumpLevel = maxLevel
 	}
 
 	// Clear seen for learnt clause
@@ -68,7 +68,5 @@ func (s *Solver) learn(c *packed.Clause) (*packed.Clause, int) {
 		s.seen[l.Var()] = 0
 	}
 
-	learnC := packed.NewClause(0)
-	learnC.SetLits(learnt)
-	return learnC, backjumpLevel
+	return packed.Clause(learnt), backjumpLevel
 }

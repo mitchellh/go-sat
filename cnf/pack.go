@@ -8,7 +8,7 @@ import (
 // is a more solver-friendly representation of a formula at the expense
 // of a more complicated representation.
 func (f Formula) Pack() packed.Formula {
-	cs := make([]*packed.Clause, len(f))
+	cs := make([]packed.Clause, len(f))
 	for i, rawC := range f {
 		// Create the lits
 		lits := make([]packed.Lit, len(rawC))
@@ -17,9 +17,7 @@ func (f Formula) Pack() packed.Formula {
 		}
 
 		// Create the packed clause
-		raw := packed.NewClause(0)
-		raw.SetLits(lits)
-		cs[i] = raw
+		cs[i] = packed.Clause(lits)
 	}
 
 	return packed.Formula(cs)

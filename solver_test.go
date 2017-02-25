@@ -90,7 +90,7 @@ func TestSolve_table(t *testing.T) {
 			s.Trace = true
 			s.Tracer = newTracer(t)
 			s.decideLiterals = tc.Decide
-			s.AddFormula(cnf.NewFormulaFromInts(tc.Formula))
+			s.AddFormula(cnf.NewFormulaFromInts(tc.Formula).Pack())
 
 			actual := s.Solve()
 			if actual != tc.Result {
@@ -171,7 +171,7 @@ func satlibTestFile(t *testing.T, path string, expected bool) {
 		Trace:   true,
 		Tracer:  &testTracer{T: t},
 	*/
-	s.AddFormula(p.Formula)
+	s.AddFormula(p.Formula.Pack())
 
 	actual := s.Solve()
 	if actual != expected {

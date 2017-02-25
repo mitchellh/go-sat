@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/mitchellh/go-sat/cnf"
+	"github.com/mitchellh/go-sat/packed"
 )
 
 type satResult byte
@@ -39,6 +40,12 @@ type Solver struct {
 	m         *trail
 	reasonMap map[cnf.Literal]cnf.Clause
 
+	// problem
+	clauses []packed.Clause
+
+	// trail
+	assigns map[int]Tribool // var assignments
+
 	// conflict clause caching
 	c  cnf.Clause
 	cH map[cnf.Literal]struct{} // literals in C
@@ -50,9 +57,19 @@ type Solver struct {
 // New creates a new solver and allocates the basics for it.
 func New() *Solver {
 	return &Solver{
+		result: satResultUndef,
+
 		m:         newTrail(),
 		reasonMap: make(map[cnf.Literal]cnf.Clause),
+
+		// trail
+		assigns: make(map[int]Tribool),
 	}
+}
+
+// ValueLit reads the currently set value for a literal.
+func (s *Solver) ValueLit(l packed.Lit) Tribool {
+	return s.assigns[l.Var()]
 }
 
 // Solve finds a solution for the formula, returning true on satisfiability.

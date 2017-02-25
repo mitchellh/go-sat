@@ -2,12 +2,13 @@ package sat
 
 import (
 	"github.com/mitchellh/go-sat/cnf"
+	"github.com/mitchellh/go-sat/packed"
 )
 
 // AddFormula adds the given formula to the solver.
 //
 // This can only be called before Solve() is called.
-func (s *Solver) AddFormula(f cnf.Formula) {
+func (s *Solver) AddFormula(f packed.Formula) {
 	for _, c := range f {
 		s.AddClause(c)
 	}
@@ -16,46 +17,67 @@ func (s *Solver) AddFormula(f cnf.Formula) {
 // AddClause adds a Clause to solve to the solver.
 //
 // This can only be called before Solve() is called.
-func (s *Solver) AddClause(c cnf.Clause) {
-	ls := make(map[cnf.Literal]struct{})
-	for _, l := range c {
-		// If this literal is already false in the trail, then don't add
-		if s.m.IsLiteralFalse(l) {
+func (s *Solver) AddClause(c *packed.Clause) {
+	// Get the actual slice since we'll be modifying this directly.
+	// The API docs say not to but its part of our package and we know
+	// what we're doing. :)
+	lits := c.Lits()
+
+	// Keep track of an index since we'll be slicing as we go. We also
+	// keep track of the last value so that we can find tautologies (X | !X)
+	idx := 0
+	last := packed.LitUndef
+	for _, current := range lits {
+		// Due to the sorting X and !X will always be next to each other.
+		// A cheap way to check for tautologies is to just check the last
+		// value.
+		if current == last.Neg() {
 			if s.Trace {
 				s.Tracer.Printf(
-					"[TRACE] sat: addClause: not adding literal; literal %d false: %#v",
-					l, c)
+					"[TRACE] sat: addClause: not adding clause; tautology with var %s",
+					current)
+			}
+
+			return
+		}
+
+		// Check if there is currently an assigned value of the literal.
+		// If it is false then we already can skip this literal. If it is
+		// true we can avoid adding the entire clause.
+		switch s.ValueLit(current) {
+		case False:
+			if s.Trace {
+				s.Tracer.Printf(
+					"[TRACE] sat: addClause: not adding literal; literal %s false: %s",
+					current, c)
 			}
 
 			continue
-		}
 
-		// If the literal is already true, we don't add the clause at all
-		if s.m.IsLiteralTrue(l) {
+		case True:
 			if s.Trace {
 				s.Tracer.Printf(
-					"[TRACE] sat: addClause: not adding clause; literal %d already true: %#v",
-					l, c)
+					"[TRACE] sat: addClause: not adding clause; literal %s already true: %s",
+					current, c)
 			}
 
 			return
 		}
 
-		// If the clause contains both a positive and negative it is
-		// tautological.
-		if _, ok := ls[l.Negate()]; ok {
-			if s.Trace {
-				s.Tracer.Printf("[TRACE] sat: addClause: not adding clause; tautology: %#v", c)
-			}
-
-			return
+		// Due to sorting, we can quickly eliminate duplicates by only copying
+		// down when the values aren't the same.
+		if current != last {
+			lits[idx] = current
+			last = current
+			idx++
 		}
-
-		// Add the literal. This will also remove duplicates
-		ls[l] = struct{}{}
 	}
 
-	if len(ls) == 0 {
+	// Reset the size of literals to account for removed duplicates
+	lits = lits[:idx]
+
+	// If the clause is empty, then this formula can alread not be satisfied
+	if len(lits) == 0 {
 		if s.Trace {
 			s.Tracer.Printf("[TRACE] sat: addClause: empty clause, forcing unsat")
 		}
@@ -64,29 +86,34 @@ func (s *Solver) AddClause(c cnf.Clause) {
 		return
 	}
 
+	// Create the cnf Clause until we change formats
+	cnfLits := make([]cnf.Literal, len(lits))
+	for i, l := range lits {
+		cnfLits[i] = cnf.Literal(l.Int())
+	}
+	cnfC := cnf.Clause(cnfLits)
+
 	// If this is a single literal clause then we assert it cause it must be
-	if len(ls) == 1 {
-		for l, _ := range ls {
-			if s.Trace {
-				s.Tracer.Printf("[TRACE] sat: addClause: single literal clause, asserting %d", l)
-			}
+	if len(lits) == 1 {
+		l := cnf.Literal(lits[0].Int())
 
-			s.assertLiteral(l, false)
-			s.reasonMap[l] = c
-
-			// Do unit propagation since this may solve already clauses
-			s.unitPropagate()
+		if s.Trace {
+			s.Tracer.Printf("[TRACE] sat: addClause: single literal clause, asserting %s", l)
 		}
+
+		s.assertLiteral(l, false)
+		s.reasonMap[l] = cnfC
+
+		// Do unit propagation since this may solve already clauses
+		s.unitPropagate()
 
 		// We also don't add this clause since we just asserted the value
 		return
 	}
 
 	// Add it to our formula
-	c = make([]cnf.Literal, 0, len(ls))
-	for l, _ := range ls {
-		c = append(c, cnf.Literal(l))
-	}
+	s.clauses = append(s.clauses, *c)
 
-	s.f = append(s.f, c)
+	// TODO: Legacy
+	s.f = append(s.f, cnfC)
 }

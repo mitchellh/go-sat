@@ -1,4 +1,4 @@
-package sat
+package packed
 
 import (
 	"fmt"
@@ -32,12 +32,21 @@ func TestLit(t *testing.T) {
 				v *= -1
 			}
 
-			lit := newLit(v, sign)
+			lit := NewLit(v, sign)
 			if lit.Var() != tc.Var {
 				t.Fatalf("bad: %d", lit.Var())
 			}
 			if lit.Sign() != tc.Sign {
 				t.Fatalf("bad: %v", lit.Sign())
+			}
+
+			// Test negation
+			neg := lit.Neg()
+			if neg.Var() != tc.Var {
+				t.Fatalf("bad: %d", lit.Var())
+			}
+			if neg.Sign() == tc.Sign {
+				t.Fatalf("bad: %v", neg.Sign())
 			}
 		})
 	}

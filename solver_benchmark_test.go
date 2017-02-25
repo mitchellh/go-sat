@@ -71,7 +71,7 @@ func satlibBenchmarkFile(b *testing.B, path string) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		s := New()
-		s.AddFormula(p.Formula)
+		s.AddFormula(p.Formula.Pack())
 		s.Solve()
 	}
 }

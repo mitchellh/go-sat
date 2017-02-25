@@ -76,7 +76,7 @@ func (s *Solver) AddClause(c *packed.Clause) {
 	// Reset the size of literals to account for removed duplicates
 	lits = lits[:idx]
 
-	// If the clause is empty, then this formula can alread not be satisfied
+	// If the clause is empty, then this formula can already not be satisfied
 	if len(lits) == 0 {
 		if s.Trace {
 			s.Tracer.Printf("[TRACE] sat: addClause: empty clause, forcing unsat")
@@ -84,6 +84,11 @@ func (s *Solver) AddClause(c *packed.Clause) {
 
 		s.result = satResultUnsat
 		return
+	}
+
+	// Track the available decision variables
+	for _, l := range lits {
+		s.vars[l.Var()] = struct{}{}
 	}
 
 	// Create the cnf Clause until we change formats
@@ -98,7 +103,7 @@ func (s *Solver) AddClause(c *packed.Clause) {
 		l := cnf.Literal(lits[0].Int())
 
 		if s.Trace {
-			s.Tracer.Printf("[TRACE] sat: addClause: single literal clause, asserting %s", l)
+			s.Tracer.Printf("[TRACE] sat: addClause: single literal clause, asserting %d", l)
 		}
 
 		s.assertLiteral(l, false)

@@ -41,10 +41,13 @@ type Solver struct {
 	reasonMap map[cnf.Literal]cnf.Clause
 
 	// problem
-	clauses []packed.Clause
+	clauses []packed.Clause  // clauses to solve
+	vars    map[int]struct{} // list of available vars
 
 	// trail
-	assigns map[int]Tribool // var assignments
+	assigns  map[int]Tribool // var assignments
+	trail    []packed.Lit    // actual trail
+	trailIdx []int           // indices of different decision levels in trail
 
 	// conflict clause caching
 	c  cnf.Clause
@@ -62,14 +65,12 @@ func New() *Solver {
 		m:         newTrail(),
 		reasonMap: make(map[cnf.Literal]cnf.Clause),
 
+		// problem
+		vars: make(map[int]struct{}),
+
 		// trail
 		assigns: make(map[int]Tribool),
 	}
-}
-
-// ValueLit reads the currently set value for a literal.
-func (s *Solver) ValueLit(l packed.Lit) Tribool {
-	return s.assigns[l.Var()]
 }
 
 // Solve finds a solution for the formula, returning true on satisfiability.
@@ -88,10 +89,6 @@ func (s *Solver) Solve() bool {
 
 		return s.result == satResultSat
 	}
-
-	// Available vars to set
-	varsF := s.f.Vars()
-	totalVars := len(varsF) + s.m.Len()
 
 	for {
 		// Perform unit propagation
@@ -125,7 +122,7 @@ func (s *Solver) Solve() bool {
 		} else {
 			// If the trail contains the same number of elements as
 			// the variables in the formula, then we've found a satisfaction.
-			if s.m.Len() == totalVars {
+			if s.m.Len() == len(s.vars) {
 				if s.Trace {
 					s.Tracer.Printf("[TRACE] sat: solver found solution: %s", s.m)
 				}
@@ -135,12 +132,10 @@ func (s *Solver) Solve() bool {
 
 			// Choose a literal to assert. For now we naively just select
 			// the next literal.
-			lit := s.selectLiteral(varsF)
-
+			lit := s.selectLiteral()
 			if s.Trace {
 				s.Tracer.Printf("[TRACE] sat: assert: %d (decision)", lit)
 			}
-
 			s.assertLiteral(lit, true)
 		}
 	}
@@ -148,11 +143,7 @@ func (s *Solver) Solve() bool {
 	return false
 }
 
-func (s *Solver) assertLiteral(l cnf.Literal, d bool) {
-	s.m.Assert(l, d)
-}
-
-func (s *Solver) selectLiteral(vars map[cnf.Literal]struct{}) cnf.Literal {
+func (s *Solver) selectLiteral() cnf.Literal {
 	tMap := map[cnf.Literal]struct{}{}
 	for _, e := range s.m.elems {
 		lit := e.Lit
@@ -174,7 +165,8 @@ func (s *Solver) selectLiteral(vars map[cnf.Literal]struct{}) cnf.Literal {
 		return result
 	}
 
-	for k, _ := range vars {
+	for raw, _ := range s.vars {
+		k := cnf.Literal(raw)
 		if _, ok := tMap[k]; !ok {
 			return k
 		}

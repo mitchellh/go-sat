@@ -24,9 +24,6 @@ func (s *Solver) ValueLit(l packed.Lit) Tribool {
 }
 
 func (s *Solver) assertLiteral(l cnf.Literal, d bool) {
-	// TODO: old legacy
-	s.m.Assert(l, d)
-
 	// If this is a decision literal, then create a new decision level
 	if d {
 		s.newDecisionLevel()
@@ -34,8 +31,68 @@ func (s *Solver) assertLiteral(l cnf.Literal, d bool) {
 
 	// Store the literal in the trail
 	pl := l.Pack()
-	s.assigns[pl.Var()] = BoolToTri(!pl.Sign())
+	v := pl.Var()
+	s.assigns[v] = BoolToTri(!pl.Sign())
+	s.varinfo[v] = varinfo{level: s.decisionLevel()}
 	s.trail = append(s.trail, pl)
+}
+
+// level returns the level for the variable specified by v. This variable
+// must be assigned for this to be correct.
+func (s *Solver) level(v int) int {
+	return s.varinfo[v].level
+}
+
+// IsUnit returns true if the clause c is a unit clause in t with
+// literal l. Clause c must be a clause within the formula that this
+// trail is being used for.
+func (s *Solver) isUnit(c cnf.Clause, unitL cnf.Literal) bool {
+	l := unitL.Pack()
+
+	// If we already have the unit literal we're looking for (+ or -),
+	// then this is not a unit clause
+	if _, ok := s.assigns[l.Var()]; ok {
+		return false
+	}
+
+	for _, l := range c {
+		if l == unitL || l == unitL.Negate() {
+			continue
+		}
+
+		if v := s.ValueLit(l.Pack()); v == Undef || v == True {
+			return false
+		}
+	}
+
+	return true
+}
+
+// IsFormulaFalse returns a non-zero Clause if the given Formula f is
+// false in the current valuation (trail). This non-zero clause is a false
+// clause.
+func (s *Solver) isFormulaFalse() cnf.Clause {
+	// If we have no trail, we can't contain the negated formula
+	if len(s.trail) == 0 {
+		return cnf.Clause(nil)
+	}
+
+	// We need to find ONE negated clause in f
+	for _, c := range s.f {
+		found := false
+		for _, raw := range c {
+			if s.ValueLit(raw.Pack()) != False {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return c
+		}
+	}
+
+	return cnf.Clause(nil)
 }
 
 // newDecisionLevel creates a new decision level within the trail
@@ -46,4 +103,23 @@ func (s *Solver) newDecisionLevel() {
 // decisionLevel returns the current decision level
 func (s *Solver) decisionLevel() int {
 	return len(s.trailIdx)
+}
+
+// trimToDecisionLevel trims the trail down to the given level (including
+// that level).
+func (s *Solver) trimToDecisionLevel(level int) {
+	if s.decisionLevel() <= level {
+		return
+	}
+
+	lastIdx := s.trailIdx[level]
+
+	// Unassign anything in the trail in higher levels
+	for i := len(s.trail) - 1; i >= lastIdx; i-- {
+		delete(s.assigns, s.trail[i].Var())
+	}
+
+	// Reset the trail length
+	s.trail = s.trail[:lastIdx]
+	s.trailIdx = s.trailIdx[:level]
 }

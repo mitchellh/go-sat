@@ -142,34 +142,6 @@ func (t trail) String() string {
 	return "[" + strings.Join(result, ", ") + "]"
 }
 
-// IsUnit returns true if the clause c is a unit clause in t with
-// literal l. Clause c must be a clause within the formula that this
-// trail is being used for.
-func (t *trail) IsUnit(c cnf.Clause, unitL cnf.Literal) bool {
-	m := t.set
-
-	// If we already have the unit literal we're looking for (+ or -),
-	// then this is not a unit clause
-	if _, ok := m[unitL]; ok {
-		return false
-	}
-	if _, ok := m[unitL.Negate()]; ok {
-		return false
-	}
-
-	for _, l := range c {
-		if l == unitL || l == unitL.Negate() {
-			continue
-		}
-
-		if _, ok := m[l.Negate()]; !ok {
-			return false
-		}
-	}
-
-	return true
-}
-
 // IsFormulaFalse returns a non-zero Clause if the given Formula f is
 // false in the current valuation (trail). This non-zero clause is a false
 // clause.

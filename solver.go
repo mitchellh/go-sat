@@ -37,7 +37,6 @@ type Solver struct {
 	result satResult
 
 	f         cnf.Formula // formula we're solving
-	m         *trail
 	reasonMap map[cnf.Literal]cnf.Clause
 
 	// problem
@@ -46,6 +45,7 @@ type Solver struct {
 
 	// trail
 	assigns  map[int]Tribool // var assignments
+	varinfo  map[int]varinfo // var info
 	trail    []packed.Lit    // actual trail
 	trailIdx []int           // indices of different decision levels in trail
 
@@ -62,7 +62,6 @@ func New() *Solver {
 	return &Solver{
 		result: satResultUndef,
 
-		m:         newTrail(),
 		reasonMap: make(map[cnf.Literal]cnf.Clause),
 
 		// problem
@@ -70,6 +69,7 @@ func New() *Solver {
 
 		// trail
 		assigns: make(map[int]Tribool),
+		varinfo: make(map[int]varinfo),
 	}
 }
 
@@ -94,10 +94,10 @@ func (s *Solver) Solve() bool {
 		// Perform unit propagation
 		s.unitPropagate()
 
-		conflictC := s.m.IsFormulaFalse(s.f)
+		conflictC := s.isFormulaFalse()
 		if !conflictC.IsZero() {
 			if s.Trace {
-				s.Tracer.Printf("[TRACE] sat: current trail contains negated formula: %s", s.m)
+				s.Tracer.Printf("[TRACE] sat: current trail contains negated formula: %#v", s.trail)
 				s.Tracer.Printf("[TRACE] sat: conflict clause: %#v", conflictC)
 			}
 
@@ -106,7 +106,7 @@ func (s *Solver) Solve() bool {
 
 			// If we have no more decisions within the trail, then we've
 			// failed finding a satisfying value.
-			if s.m.DecisionsLen() == 0 {
+			if s.decisionLevel() == 0 {
 				return false
 			}
 
@@ -122,9 +122,9 @@ func (s *Solver) Solve() bool {
 		} else {
 			// If the trail contains the same number of elements as
 			// the variables in the formula, then we've found a satisfaction.
-			if s.m.Len() == len(s.vars) {
+			if len(s.trail) == len(s.vars) {
 				if s.Trace {
-					s.Tracer.Printf("[TRACE] sat: solver found solution: %s", s.m)
+					s.Tracer.Printf("[TRACE] sat: solver found solution: %#v", s.trail)
 				}
 
 				return true
@@ -144,21 +144,11 @@ func (s *Solver) Solve() bool {
 }
 
 func (s *Solver) selectLiteral() cnf.Literal {
-	tMap := map[cnf.Literal]struct{}{}
-	for _, e := range s.m.elems {
-		lit := e.Lit
-		if lit < 0 {
-			lit = cnf.Literal(-int(lit))
-		}
-
-		tMap[lit] = struct{}{}
-	}
-
 	if len(s.decideLiterals) > 0 {
 		result := cnf.Literal(s.decideLiterals[0])
 		s.decideLiterals = s.decideLiterals[1:]
 
-		if _, ok := tMap[result]; ok {
+		if _, ok := s.assigns[int(result)]; ok {
 			panic(fmt.Sprintf("decideLiteral taken: %d", result))
 		}
 
@@ -166,9 +156,8 @@ func (s *Solver) selectLiteral() cnf.Literal {
 	}
 
 	for raw, _ := range s.vars {
-		k := cnf.Literal(raw)
-		if _, ok := tMap[k]; !ok {
-			return k
+		if _, ok := s.assigns[raw]; !ok {
+			return cnf.Literal(raw)
 		}
 	}
 
@@ -183,11 +172,11 @@ func (s *Solver) unitPropagate() {
 	for {
 		for _, c := range s.f {
 			for _, l := range c {
-				if s.m.IsUnit(c, l) {
+				if s.isUnit(c, l) {
 					if s.Trace {
 						s.Tracer.Printf(
-							"[TRACE] sat: found unit clause %v with literal %d in trail %s",
-							c, l, s.m)
+							"[TRACE] sat: found unit clause %v with literal %d in trail %#v",
+							c, l, s.trail)
 					}
 
 					s.assertLiteral(l, false)
@@ -203,7 +192,7 @@ func (s *Solver) unitPropagate() {
 	UNIT_REPEAT:
 		// We found a unit clause but we have to check if we violated
 		// constraints in the trail.
-		if !s.m.IsFormulaFalse(s.f).IsZero() {
+		if !s.isFormulaFalse().IsZero() {
 			return
 		}
 	}
@@ -224,8 +213,8 @@ func (s *Solver) applyConflict(c cnf.Clause) {
 	}
 
 	// Find the last asserted literal using the cache
-	for i := len(s.m.elems) - 1; i >= 0; i-- {
-		s.cL = s.m.elems[i].Lit
+	for i := len(s.trail) - 1; i >= 0; i-- {
+		s.cL = cnf.Literal(s.trail[i].Int())
 		if _, ok := s.cH[s.cL.Negate()]; ok {
 			break
 		}
@@ -240,10 +229,10 @@ func (s *Solver) applyConflict(c cnf.Clause) {
 
 func (s *Solver) addConflictLiteral(l cnf.Literal) {
 	if _, ok := s.cH[l]; !ok {
-		level := s.m.Level(l.Negate())
+		level := s.level(l.Pack().Var())
 		if level > 0 {
 			s.cH[l] = struct{}{}
-			if level == s.m.CurrentLevel() {
+			if level == s.decisionLevel() {
 				s.cN++
 			} else {
 				s.cP[l] = struct{}{}
@@ -255,7 +244,7 @@ func (s *Solver) addConflictLiteral(l cnf.Literal) {
 func (s *Solver) removeConflictLiteral(l cnf.Literal) {
 	delete(s.cH, l)
 
-	if s.m.Level(l.Negate()) == s.m.CurrentLevel() {
+	if s.level(l.Pack().Var()) == s.decisionLevel() {
 		s.cN--
 	} else {
 		delete(s.cP, l)
@@ -273,8 +262,8 @@ func (s *Solver) applyExplain(lit cnf.Literal) {
 	}
 
 	// Find the last asserted literal using the cache
-	for i := len(s.m.elems) - 1; i >= 0; i-- {
-		s.cL = s.m.elems[i].Lit
+	for i := len(s.trail) - 1; i >= 0; i-- {
+		s.cL = cnf.Literal(s.trail[i].Int())
 		if _, ok := s.cH[s.cL.Negate()]; ok {
 			break
 		}
@@ -314,7 +303,7 @@ func (s *Solver) applyBackjump() {
 	level := 0
 	if len(s.cP) > 0 {
 		for l, _ := range s.cP {
-			if v := s.m.set[l.Negate()]; v > level {
+			if v := s.level(l.Pack().Var()); v > level {
 				level = v
 			}
 		}
@@ -326,13 +315,13 @@ func (s *Solver) applyBackjump() {
 			s.c, s.cL, level)
 	}
 
-	s.m.TrimToLevel(level)
+	s.trimToDecisionLevel(level)
 
 	lit := s.cL.Negate()
 	s.assertLiteral(lit, false)
 	s.reasonMap[lit] = s.c
 
 	if s.Trace {
-		s.Tracer.Printf("[TRACE] sat: backjump. M = %s", s.m)
+		s.Tracer.Printf("[TRACE] sat: backjump. M = %#v", s.trail)
 	}
 }

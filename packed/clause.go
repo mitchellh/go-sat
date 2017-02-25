@@ -2,7 +2,6 @@ package packed
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -40,11 +39,6 @@ func (c *Clause) MaxVar() int {
 // It is unsafe to use lits for anything else after this.
 func (c *Clause) SetLits(lits []Lit) {
 	c.lits = lits
-
-	// Sort
-	sort.Slice(lits, func(i, j int) bool {
-		return lits[i] < lits[j]
-	})
 
 	// Update the max var
 	for _, l := range c.lits {

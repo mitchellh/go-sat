@@ -1,6 +1,9 @@
 package sat
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/mitchellh/go-sat/packed"
 )
 
@@ -22,11 +25,11 @@ func (s *Solver) ValueLit(l packed.Lit) Tribool {
 	return result
 }
 
-func (s *Solver) assertLiteral(l packed.Lit) {
+func (s *Solver) assertLiteral(l packed.Lit, from *packed.Clause) {
 	// Store the literal in the trail
 	v := l.Var()
 	s.assigns[v] = BoolToTri(!l.Sign())
-	s.varinfo[v] = varinfo{level: s.decisionLevel()}
+	s.varinfo[v] = varinfo{reason: from, level: s.decisionLevel()}
 	s.trail = append(s.trail, l)
 }
 
@@ -110,7 +113,28 @@ func (s *Solver) trimToDecisionLevel(level int) {
 		delete(s.assigns, s.trail[i].Var())
 	}
 
+	// Update our queue head
+	s.qhead = lastIdx
+
 	// Reset the trail length
 	s.trail = s.trail[:lastIdx]
 	s.trailIdx = s.trailIdx[:level]
+}
+
+// trailString is used for debugging
+func (s *Solver) trailString() string {
+	vs := make([]string, len(s.trail))
+	for i, l := range s.trail {
+		decision := ""
+		for _, idx := range s.trailIdx {
+			if idx == i {
+				decision = "| "
+				break
+			}
+		}
+
+		vs[i] = fmt.Sprintf("%s%s", decision, l)
+	}
+
+	return fmt.Sprintf("[%s]", strings.Join(vs, ", "))
 }

@@ -25,18 +25,14 @@ type Solver struct {
 	//---------------------------------------------------------------
 	result satResult
 
-	reasonMap map[packed.Lit]packed.Clause
-
 	// problem
-	clauses []packed.Clause  // clauses to solve
+	clauses []*packed.Clause // clauses to solve
 	vars    map[int]struct{} // list of available vars
 
-	// conflict clause caching
-	c  *packed.Clause
-	cH map[packed.Lit]struct{} // literals in C
-	cP map[packed.Lit]struct{} // literals in lower decision levels of C
-	cL packed.Lit              // last asserted literal in C
-	cN int                     // number of literals in the highest decision level of C
+	// two-literal watching
+	qhead   int
+	watches map[packed.Lit][]*watcher
+	seen    map[int]int8
 
 	//---------------------------------------------------------------
 	// trail
@@ -65,14 +61,16 @@ func New() *Solver {
 	return &Solver{
 		result: satResultUndef,
 
-		reasonMap: make(map[packed.Lit]packed.Clause),
-
 		// problem
 		vars: make(map[int]struct{}),
 
 		// trail
 		assigns: make(map[int]Tribool),
 		varinfo: make(map[int]varinfo),
+
+		// two-literal watches
+		watches: make(map[packed.Lit][]*watcher),
+		seen:    make(map[int]int8),
 	}
 }
 
@@ -94,34 +92,52 @@ func (s *Solver) Solve() bool {
 	}
 
 	for {
-		// Perform unit propagation
-		s.unitPropagate()
-
-		conflictC := s.isFormulaFalse()
+		conflictC := s.propagate()
 		if conflictC != nil {
 			if s.Trace {
-				s.Tracer.Printf("[TRACE] sat: current trail contains negated formula: %s", s.trail)
-				s.Tracer.Printf("[TRACE] sat: conflict clause: %#v", conflictC)
+				s.Tracer.Printf("[TRACE] sat: current trail contains negated formula. trail: %s", s.trailString())
+				s.Tracer.Printf("[TRACE] sat: conflict clause: %s", conflictC)
 			}
-
-			// Set our conflict clause
-			s.applyConflict(conflictC)
 
 			// If we have no more decisions within the trail, then we've
 			// failed finding a satisfying value.
 			if s.decisionLevel() == 0 {
+				if s.Trace {
+					s.Tracer.Printf("[TRACE] sat: at decision level 0. UNSAT")
+				}
+
 				return false
 			}
 
-			// Explain to learn our conflict clause
-			s.applyExplainUIP()
-			if len(s.c.Lits()) > 1 {
-				if s.Trace {
-					s.Tracer.Printf("[TRACE] sat: learned clause: %#v", s.c)
-				}
-				s.clauses = append(s.clauses, *s.c)
+			// Learn
+			learnt, level := s.learn(conflictC)
+			if s.Trace {
+				s.Tracer.Printf("[TRACE] sat: learned clause: %s", learnt)
 			}
-			s.applyBackjump()
+
+			// Backjump
+			s.trimToDecisionLevel(level)
+			if s.Trace {
+				s.Tracer.Printf(
+					"[TRACE] sat: backjump to level %d, trail: %s",
+					level, s.trail)
+			}
+
+			// Add our learned clause
+			lits := learnt.Lits()
+			if s.Trace {
+				s.Tracer.Printf(
+					"[TRACE] sat: asserting learned literal: %s", lits[0])
+			}
+			if len(lits) == 1 {
+				s.assertLiteral(lits[0], nil)
+			} else {
+				c := packed.NewClause(0)
+				c.SetLits(lits)
+				s.clauses = append(s.clauses, c)
+				s.watchClause(c)
+				s.assertLiteral(lits[0], c)
+			}
 		} else {
 			// Choose a literal to assert.
 			lit := s.selectLiteral()
@@ -140,7 +156,7 @@ func (s *Solver) Solve() bool {
 				s.Tracer.Printf("[TRACE] sat: assert: %s (decision)", lit)
 			}
 			s.newDecisionLevel()
-			s.assertLiteral(lit)
+			s.assertLiteral(lit, nil)
 		}
 	}
 
@@ -158,171 +174,6 @@ func (s *Solver) selectLiteral() packed.Lit {
 }
 
 //-------------------------------------------------------------------
-// Unit Propagation
-//-------------------------------------------------------------------
-
-func (s *Solver) unitPropagate() {
-	for {
-		for _, c := range s.clauses {
-			for _, l := range c.Lits() {
-				if s.isUnit(c, l) {
-					if s.Trace {
-						s.Tracer.Printf(
-							"[TRACE] sat: found unit clause %v with literal %d in trail %s",
-							c, l, s.trail)
-					}
-
-					s.assertLiteral(l)
-					s.reasonMap[l] = c
-					goto UNIT_REPEAT
-				}
-			}
-		}
-
-		// We didn't find a unit clause, close it out
-		return
-
-	UNIT_REPEAT:
-		// We found a unit clause but we have to check if we violated
-		// constraints in the trail.
-		if s.isFormulaFalse() != nil {
-			return
-		}
-	}
-}
-
-//-------------------------------------------------------------------
-// Conflict Clause Learning
-//-------------------------------------------------------------------
-
-func (s *Solver) applyConflict(c *packed.Clause) {
-	// Build up our lookup caches for the conflict data to optimize
-	// the conflict learning process.
-	s.cH = make(map[packed.Lit]struct{})
-	s.cP = make(map[packed.Lit]struct{})
-	s.cN = 0
-	for _, l := range c.Lits() {
-		s.addConflictLiteral(l)
-	}
-
-	// Find the last asserted literal using the cache
-	for i := len(s.trail) - 1; i >= 0; i-- {
-		s.cL = s.trail[i]
-		if _, ok := s.cH[s.cL.Neg()]; ok {
-			break
-		}
-	}
-
-	if s.Trace {
-		s.Tracer.Printf(
-			"[TRACE] sat: applyConflict. cH = %v; cP = %v; cL = %d; cN = %d",
-			s.cH, s.cP, s.cL, s.cN)
-	}
-}
-
-func (s *Solver) addConflictLiteral(l packed.Lit) {
-	if _, ok := s.cH[l]; !ok {
-		level := s.level(l.Var())
-		if level > 0 {
-			s.cH[l] = struct{}{}
-			if level == s.decisionLevel() {
-				s.cN++
-			} else {
-				s.cP[l] = struct{}{}
-			}
-		}
-	}
-}
-
-func (s *Solver) removeConflictLiteral(l packed.Lit) {
-	delete(s.cH, l)
-
-	if s.level(l.Var()) == s.decisionLevel() {
-		s.cN--
-	} else {
-		delete(s.cP, l)
-	}
-}
-
-func (s *Solver) applyExplain(lit packed.Lit) {
-	s.removeConflictLiteral(lit.Neg())
-
-	reason := s.reasonMap[lit]
-	for _, l := range reason.Lits() {
-		if l != lit {
-			s.addConflictLiteral(l)
-		}
-	}
-
-	// Find the last asserted literal using the cache
-	for i := len(s.trail) - 1; i >= 0; i-- {
-		s.cL = s.trail[i]
-		if _, ok := s.cH[s.cL.Neg()]; ok {
-			break
-		}
-	}
-
-	if s.Trace {
-		s.Tracer.Printf("[TRACE] sat: applyExplain: lit = %d, reason = %#v", lit, reason)
-		s.Tracer.Printf(
-			"[TRACE] sat: applyExplain. cH = %v; cP = %v; cL = %d; cN = %d",
-			s.cH, s.cP, s.cL, s.cN)
-	}
-}
-
-func (s *Solver) applyExplainUIP() {
-	for s.cN != 1 { // !isUIP
-		s.applyExplain(s.cL)
-	}
-
-	// buildC
-	lits := make([]packed.Lit, 0, len(s.cP)+1)
-	for l, _ := range s.cP {
-		lits = append(lits, l)
-	}
-	lits = append(lits, s.cL.Neg())
-
-	c := packed.NewClause(0)
-	c.SetLits(lits)
-	s.c = c
-}
-
-func (s *Solver) isUIP() bool {
-	return s.cN == 1
-}
-
-//-------------------------------------------------------------------
-// Backjumping
-//-------------------------------------------------------------------
-
-func (s *Solver) applyBackjump() {
-	level := 0
-	if len(s.cP) > 0 {
-		for l, _ := range s.cP {
-			if v := s.level(l.Var()); v > level {
-				level = v
-			}
-		}
-	}
-
-	if s.Trace {
-		s.Tracer.Printf(
-			"[TRACE] sat: backjump. C = %#v; l = %d; level = %d",
-			s.c, s.cL, level)
-	}
-
-	s.trimToDecisionLevel(level)
-
-	lit := s.cL.Neg()
-	s.assertLiteral(lit)
-	s.reasonMap[lit] = *s.c
-
-	if s.Trace {
-		s.Tracer.Printf("[TRACE] sat: backjump. M = %s", s.trail)
-	}
-}
-
-//-------------------------------------------------------------------
 // Private types
 //-------------------------------------------------------------------
 
@@ -335,7 +186,8 @@ const (
 )
 
 type varinfo struct {
-	level int
+	reason *packed.Clause
+	level  int
 }
 
 // Tribool is a tri-state boolean with undefined as the 3rd state.

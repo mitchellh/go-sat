@@ -167,10 +167,8 @@ func satlibTestFile(t *testing.T, path string, expected bool) {
 
 	// Solve it
 	s := New()
-	/*
-		Trace:   true,
-		Tracer:  &testTracer{T: t},
-	*/
+	s.Trace = false
+	s.Tracer = newTracer(t)
 	s.AddFormula(p.Formula.Pack())
 
 	actual := s.Solve()

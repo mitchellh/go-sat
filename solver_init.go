@@ -1,7 +1,8 @@
 package sat
 
 import (
-	"github.com/mitchellh/go-sat/cnf"
+	"sort"
+
 	"github.com/mitchellh/go-sat/packed"
 )
 
@@ -22,6 +23,11 @@ func (s *Solver) AddClause(c *packed.Clause) {
 	// The API docs say not to but its part of our package and we know
 	// what we're doing. :)
 	lits := c.Lits()
+
+	// Sort
+	sort.Slice(lits, func(i, j int) bool {
+		return lits[i] < lits[j]
+	})
 
 	// Keep track of an index since we'll be slicing as we go. We also
 	// keep track of the last value so that we can find tautologies (X | !X)
@@ -96,22 +102,20 @@ func (s *Solver) AddClause(c *packed.Clause) {
 
 	// If this is a single literal clause then we assert it cause it must be
 	if len(lits) == 1 {
-		l := cnf.Literal(lits[0].Int())
-
 		if s.Trace {
-			s.Tracer.Printf("[TRACE] sat: addClause: single literal clause, asserting %d", l)
+			s.Tracer.Printf("[TRACE] sat: addClause: single literal clause, asserting %s", lits[0])
 		}
 
-		s.assertLiteral(lits[0])
-		s.reasonMap[lits[0]] = *c
+		s.assertLiteral(lits[0], nil)
 
 		// Do unit propagation since this may solve already clauses
-		s.unitPropagate()
+		s.propagate()
 
 		// We also don't add this clause since we just asserted the value
 		return
 	}
 
 	// Add it to our formula
-	s.clauses = append(s.clauses, *c)
+	s.clauses = append(s.clauses, c)
+	s.watchClause(c)
 }

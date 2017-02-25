@@ -103,7 +103,7 @@ func (s *Solver) AddClause(c *packed.Clause) {
 		}
 
 		s.assertLiteral(lits[0])
-		s.reasonMap[lits[0]] = c
+		s.reasonMap[lits[0]] = *c
 
 		// Do unit propagation since this may solve already clauses
 		s.unitPropagate()

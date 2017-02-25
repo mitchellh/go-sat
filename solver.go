@@ -25,7 +25,7 @@ type Solver struct {
 	//---------------------------------------------------------------
 	result satResult
 
-	reasonMap map[packed.Lit]*packed.Clause
+	reasonMap map[packed.Lit]packed.Clause
 
 	// problem
 	clauses []packed.Clause  // clauses to solve
@@ -65,7 +65,7 @@ func New() *Solver {
 	return &Solver{
 		result: satResultUndef,
 
-		reasonMap: make(map[packed.Lit]*packed.Clause),
+		reasonMap: make(map[packed.Lit]packed.Clause),
 
 		// problem
 		vars: make(map[int]struct{}),
@@ -173,7 +173,7 @@ func (s *Solver) unitPropagate() {
 					}
 
 					s.assertLiteral(l)
-					s.reasonMap[l] = c.Ref()
+					s.reasonMap[l] = c
 					goto UNIT_REPEAT
 				}
 			}
@@ -315,7 +315,7 @@ func (s *Solver) applyBackjump() {
 
 	lit := s.cL.Neg()
 	s.assertLiteral(lit)
-	s.reasonMap[lit] = s.c
+	s.reasonMap[lit] = *s.c
 
 	if s.Trace {
 		s.Tracer.Printf("[TRACE] sat: backjump. M = %s", s.trail)

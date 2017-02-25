@@ -102,7 +102,7 @@ func (s *Solver) Solve() bool {
 		conflictC := s.isFormulaFalse()
 		if !conflictC.IsZero() {
 			if s.Trace {
-				s.Tracer.Printf("[TRACE] sat: current trail contains negated formula: %#v", s.trail)
+				s.Tracer.Printf("[TRACE] sat: current trail contains negated formula: %s", s.trail)
 				s.Tracer.Printf("[TRACE] sat: conflict clause: %#v", conflictC)
 			}
 
@@ -132,7 +132,7 @@ func (s *Solver) Solve() bool {
 			// we have solved the formula
 			if lit == packed.LitUndef {
 				if s.Trace {
-					s.Tracer.Printf("[TRACE] sat: solver found solution: %#v", s.trail)
+					s.Tracer.Printf("[TRACE] sat: solver found solution: %s", s.trail)
 				}
 
 				return true
@@ -170,7 +170,7 @@ func (s *Solver) unitPropagate() {
 				if s.isUnit(c, l) {
 					if s.Trace {
 						s.Tracer.Printf(
-							"[TRACE] sat: found unit clause %v with literal %d in trail %#v",
+							"[TRACE] sat: found unit clause %v with literal %d in trail %s",
 							c, l, s.trail)
 					}
 
@@ -317,7 +317,7 @@ func (s *Solver) applyBackjump() {
 	s.reasonMap[lit] = s.c
 
 	if s.Trace {
-		s.Tracer.Printf("[TRACE] sat: backjump. M = %#v", s.trail)
+		s.Tracer.Printf("[TRACE] sat: backjump. M = %s", s.trail)
 	}
 }
 

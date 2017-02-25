@@ -7,10 +7,6 @@
 // literals.
 package cnf
 
-import (
-	"github.com/mitchellh/go-sat/packed"
-)
-
 // Formula represents a Boolean formula in conjunctive normal form (CNF).
 type Formula []Clause
 
@@ -36,27 +32,6 @@ func NewFormulaFromInts(raw [][]int) Formula {
 	}
 
 	return Formula(cs)
-}
-
-// Pack converts this formula to a packed Formula. The packed formula
-// is a more solver-friendly representation of a formula at the expense
-// of a more complicated representation.
-func (f Formula) Pack() packed.Formula {
-	cs := make([]*packed.Clause, len(f))
-	for i, rawC := range f {
-		// Create the lits
-		lits := make([]packed.Lit, len(rawC))
-		for j, rawL := range rawC {
-			lits[j] = packed.NewLitInt(int(rawL))
-		}
-
-		// Create the packed clause
-		raw := packed.NewClause(0)
-		raw.SetLits(lits)
-		cs[i] = raw
-	}
-
-	return packed.Formula(cs)
 }
 
 func (f Formula) Ints() [][]int {

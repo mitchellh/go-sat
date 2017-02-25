@@ -86,17 +86,13 @@ func (s *Solver) AddClause(c *packed.Clause) {
 		return
 	}
 
+	// Update literals since we're for sure using this clause
+	c.SetLits(lits)
+
 	// Track the available decision variables
 	for _, l := range lits {
 		s.vars[l.Var()] = struct{}{}
 	}
-
-	// Create the cnf Clause until we change formats
-	cnfLits := make([]cnf.Literal, len(lits))
-	for i, l := range lits {
-		cnfLits[i] = cnf.Literal(l.Int())
-	}
-	cnfC := cnf.Clause(cnfLits)
 
 	// If this is a single literal clause then we assert it cause it must be
 	if len(lits) == 1 {
@@ -107,7 +103,7 @@ func (s *Solver) AddClause(c *packed.Clause) {
 		}
 
 		s.assertLiteral(lits[0])
-		s.reasonMap[l] = cnfC
+		s.reasonMap[lits[0]] = c
 
 		// Do unit propagation since this may solve already clauses
 		s.unitPropagate()
@@ -118,7 +114,4 @@ func (s *Solver) AddClause(c *packed.Clause) {
 
 	// Add it to our formula
 	s.clauses = append(s.clauses, *c)
-
-	// TODO: Legacy
-	s.f = append(s.f, cnfC)
 }

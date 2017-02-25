@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mitchellh/go-sat/cnf"
 	"github.com/mitchellh/go-sat/packed"
 )
 
@@ -118,12 +117,15 @@ func TestSolverIsUnit(t *testing.T) {
 				s.assertLiteral(packed.NewLitInt(l))
 			}
 
-			c := make([]cnf.Literal, len(tc.Clause))
+			lits := make([]packed.Lit, len(tc.Clause))
 			for i, v := range tc.Clause {
-				c[i] = cnf.Literal(v)
+				lits[i] = packed.NewLitInt(v)
 			}
 
-			actual := s.isUnit(cnf.Clause(c), cnf.Literal(tc.Lit))
+			c := packed.NewClause(0)
+			c.SetLits(lits)
+
+			actual := s.isUnit(*c, packed.NewLitInt(tc.Lit))
 			if actual != tc.IsUnit {
 				t.Fatalf("bad: %v", actual)
 			}

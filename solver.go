@@ -1,7 +1,6 @@
 package sat
 
 import (
-	"github.com/mitchellh/go-sat/cnf"
 	"github.com/mitchellh/go-sat/packed"
 )
 
@@ -26,19 +25,18 @@ type Solver struct {
 	//---------------------------------------------------------------
 	result satResult
 
-	f         cnf.Formula // formula we're solving
-	reasonMap map[cnf.Literal]cnf.Clause
+	reasonMap map[packed.Lit]*packed.Clause
 
 	// problem
 	clauses []packed.Clause  // clauses to solve
 	vars    map[int]struct{} // list of available vars
 
 	// conflict clause caching
-	c  cnf.Clause
-	cH map[cnf.Literal]struct{} // literals in C
-	cP map[cnf.Literal]struct{} // literals in lower decision levels of C
-	cL cnf.Literal              // last asserted literal in C
-	cN int                      // number of literals in the highest decision level of C
+	c  *packed.Clause
+	cH map[packed.Lit]struct{} // literals in C
+	cP map[packed.Lit]struct{} // literals in lower decision levels of C
+	cL packed.Lit              // last asserted literal in C
+	cN int                     // number of literals in the highest decision level of C
 
 	//---------------------------------------------------------------
 	// trail
@@ -67,7 +65,7 @@ func New() *Solver {
 	return &Solver{
 		result: satResultUndef,
 
-		reasonMap: make(map[cnf.Literal]cnf.Clause),
+		reasonMap: make(map[packed.Lit]*packed.Clause),
 
 		// problem
 		vars: make(map[int]struct{}),
@@ -100,7 +98,7 @@ func (s *Solver) Solve() bool {
 		s.unitPropagate()
 
 		conflictC := s.isFormulaFalse()
-		if !conflictC.IsZero() {
+		if conflictC != nil {
 			if s.Trace {
 				s.Tracer.Printf("[TRACE] sat: current trail contains negated formula: %s", s.trail)
 				s.Tracer.Printf("[TRACE] sat: conflict clause: %#v", conflictC)
@@ -117,11 +115,11 @@ func (s *Solver) Solve() bool {
 
 			// Explain to learn our conflict clause
 			s.applyExplainUIP()
-			if len(s.c) > 1 {
+			if len(s.c.Lits()) > 1 {
 				if s.Trace {
 					s.Tracer.Printf("[TRACE] sat: learned clause: %#v", s.c)
 				}
-				s.f = append(s.f, s.c)
+				s.clauses = append(s.clauses, *s.c)
 			}
 			s.applyBackjump()
 		} else {
@@ -165,8 +163,8 @@ func (s *Solver) selectLiteral() packed.Lit {
 
 func (s *Solver) unitPropagate() {
 	for {
-		for _, c := range s.f {
-			for _, l := range c {
+		for _, c := range s.clauses {
+			for _, l := range c.Lits() {
 				if s.isUnit(c, l) {
 					if s.Trace {
 						s.Tracer.Printf(
@@ -174,8 +172,8 @@ func (s *Solver) unitPropagate() {
 							c, l, s.trail)
 					}
 
-					s.assertLiteral(l.Pack())
-					s.reasonMap[l] = c
+					s.assertLiteral(l)
+					s.reasonMap[l] = c.Ref()
 					goto UNIT_REPEAT
 				}
 			}
@@ -187,7 +185,7 @@ func (s *Solver) unitPropagate() {
 	UNIT_REPEAT:
 		// We found a unit clause but we have to check if we violated
 		// constraints in the trail.
-		if !s.isFormulaFalse().IsZero() {
+		if s.isFormulaFalse() != nil {
 			return
 		}
 	}
@@ -197,20 +195,20 @@ func (s *Solver) unitPropagate() {
 // Conflict Clause Learning
 //-------------------------------------------------------------------
 
-func (s *Solver) applyConflict(c cnf.Clause) {
+func (s *Solver) applyConflict(c *packed.Clause) {
 	// Build up our lookup caches for the conflict data to optimize
 	// the conflict learning process.
-	s.cH = make(map[cnf.Literal]struct{})
-	s.cP = make(map[cnf.Literal]struct{})
+	s.cH = make(map[packed.Lit]struct{})
+	s.cP = make(map[packed.Lit]struct{})
 	s.cN = 0
-	for _, l := range c {
+	for _, l := range c.Lits() {
 		s.addConflictLiteral(l)
 	}
 
 	// Find the last asserted literal using the cache
 	for i := len(s.trail) - 1; i >= 0; i-- {
-		s.cL = cnf.Literal(s.trail[i].Int())
-		if _, ok := s.cH[s.cL.Negate()]; ok {
+		s.cL = s.trail[i]
+		if _, ok := s.cH[s.cL.Neg()]; ok {
 			break
 		}
 	}
@@ -222,9 +220,9 @@ func (s *Solver) applyConflict(c cnf.Clause) {
 	}
 }
 
-func (s *Solver) addConflictLiteral(l cnf.Literal) {
+func (s *Solver) addConflictLiteral(l packed.Lit) {
 	if _, ok := s.cH[l]; !ok {
-		level := s.level(l.Pack().Var())
+		level := s.level(l.Var())
 		if level > 0 {
 			s.cH[l] = struct{}{}
 			if level == s.decisionLevel() {
@@ -236,21 +234,21 @@ func (s *Solver) addConflictLiteral(l cnf.Literal) {
 	}
 }
 
-func (s *Solver) removeConflictLiteral(l cnf.Literal) {
+func (s *Solver) removeConflictLiteral(l packed.Lit) {
 	delete(s.cH, l)
 
-	if s.level(l.Pack().Var()) == s.decisionLevel() {
+	if s.level(l.Var()) == s.decisionLevel() {
 		s.cN--
 	} else {
 		delete(s.cP, l)
 	}
 }
 
-func (s *Solver) applyExplain(lit cnf.Literal) {
-	s.removeConflictLiteral(lit.Negate())
+func (s *Solver) applyExplain(lit packed.Lit) {
+	s.removeConflictLiteral(lit.Neg())
 
 	reason := s.reasonMap[lit]
-	for _, l := range reason {
+	for _, l := range reason.Lits() {
 		if l != lit {
 			s.addConflictLiteral(l)
 		}
@@ -258,8 +256,8 @@ func (s *Solver) applyExplain(lit cnf.Literal) {
 
 	// Find the last asserted literal using the cache
 	for i := len(s.trail) - 1; i >= 0; i-- {
-		s.cL = cnf.Literal(s.trail[i].Int())
-		if _, ok := s.cH[s.cL.Negate()]; ok {
+		s.cL = s.trail[i]
+		if _, ok := s.cH[s.cL.Neg()]; ok {
 			break
 		}
 	}
@@ -278,11 +276,14 @@ func (s *Solver) applyExplainUIP() {
 	}
 
 	// buildC
-	c := make([]cnf.Literal, 0, len(s.cP)+1)
+	lits := make([]packed.Lit, 0, len(s.cP)+1)
 	for l, _ := range s.cP {
-		c = append(c, l)
+		lits = append(lits, l)
 	}
-	c = append(c, s.cL.Negate())
+	lits = append(lits, s.cL.Neg())
+
+	c := packed.NewClause(0)
+	c.SetLits(lits)
 	s.c = c
 }
 
@@ -298,7 +299,7 @@ func (s *Solver) applyBackjump() {
 	level := 0
 	if len(s.cP) > 0 {
 		for l, _ := range s.cP {
-			if v := s.level(l.Pack().Var()); v > level {
+			if v := s.level(l.Var()); v > level {
 				level = v
 			}
 		}
@@ -312,8 +313,8 @@ func (s *Solver) applyBackjump() {
 
 	s.trimToDecisionLevel(level)
 
-	lit := s.cL.Negate()
-	s.assertLiteral(lit.Pack())
+	lit := s.cL.Neg()
+	s.assertLiteral(lit)
 	s.reasonMap[lit] = s.c
 
 	if s.Trace {

@@ -54,6 +54,11 @@ func (c *Clause) SetLits(lits []Lit) {
 	}
 }
 
+// Ref returns a reference to this clause.
+func (c *Clause) Ref() *Clause {
+	return c
+}
+
 // String representation
 func (c *Clause) String() string {
 	ls := make([]string, len(c.lits))

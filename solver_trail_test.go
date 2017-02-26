@@ -12,30 +12,30 @@ func TestSolverValueLit(t *testing.T) {
 	cases := []struct {
 		Assert int
 		Lit    int
-		Result Tribool
+		Result tribool
 	}{
 		{
 			4,
 			-4,
-			False,
+			triFalse,
 		},
 
 		{
 			4,
 			4,
-			True,
+			triTrue,
 		},
 
 		{
 			-4,
 			4,
-			False,
+			triFalse,
 		},
 
 		{
 			-4,
 			-4,
-			True,
+			triTrue,
 		},
 	}
 
@@ -45,7 +45,7 @@ func TestSolverValueLit(t *testing.T) {
 			s.assertLiteral(cnf.NewLitInt(tc.Assert), nil)
 
 			l := cnf.NewLitInt(tc.Lit)
-			result := s.ValueLit(l)
+			result := s.valueLit(l)
 			if result != tc.Result {
 				t.Fatalf("bad: %s", result)
 			}

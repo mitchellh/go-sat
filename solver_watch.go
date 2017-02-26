@@ -65,7 +65,7 @@ func (s *Solver) propagate() cnf.Clause {
 			// If the value of the literal being watched is true, then
 			// this clause is already satisfied. We maintain the watch
 			// in the watch list and continue.
-			if s.ValueLit(iW.Lit) == True {
+			if s.valueLit(iW.Lit) == triTrue {
 				if s.Trace {
 					s.Tracer.Printf(
 						"[TRACE] sat: watched lit %s became true; clause is true: %s",
@@ -108,7 +108,7 @@ func (s *Solver) propagate() cnf.Clause {
 			// We have the first != lit check since that is significantly
 			// faster to fail than the ValueLit call (~1 or 2% faster) for
 			// a common case.
-			if first != iW.Lit && s.ValueLit(first) == True {
+			if first != iW.Lit && s.valueLit(first) == triTrue {
 				watches[j] = newW
 				j++
 				continue
@@ -120,7 +120,7 @@ func (s *Solver) propagate() cnf.Clause {
 			// clause. If any are not false (true OR unassigned), then
 			// we watch that literal and move on.
 			for k := 2; k < len(iLits); k++ {
-				if s.ValueLit(iLits[k]) != False {
+				if s.valueLit(iLits[k]) != triFalse {
 					iLits[1], iLits[k] = iLits[k], pNeg
 					i1 := iLits[1].Neg()
 					s.watches[i1] = append(s.watches[i1], newW)
@@ -134,7 +134,7 @@ func (s *Solver) propagate() cnf.Clause {
 			j++
 
 			// If it is false, then this is a conflict. We return immediately.
-			if s.ValueLit(first) == False {
+			if s.valueLit(first) == triFalse {
 				// If i != j then we pruned some watches. We need to copy
 				// the rest down. copy() is expensive so we avoid it if possible.
 				if i != j {

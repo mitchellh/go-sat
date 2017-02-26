@@ -50,8 +50,8 @@ func (s *Solver) AddClause(c cnf.Clause) {
 		// Check if there is currently an assigned value of the literal.
 		// If it is false then we already can skip this literal. If it is
 		// true we can avoid adding the entire clause.
-		switch s.ValueLit(current) {
-		case False:
+		switch s.valueLit(current) {
+		case triFalse:
 			if s.Trace {
 				s.Tracer.Printf(
 					"[TRACE] sat: addClause: not adding literal; literal %s false: %s",
@@ -60,7 +60,7 @@ func (s *Solver) AddClause(c cnf.Clause) {
 
 			continue
 
-		case True:
+		case triTrue:
 			if s.Trace {
 				s.Tracer.Printf(
 					"[TRACE] sat: addClause: not adding clause; literal %s already true: %s",

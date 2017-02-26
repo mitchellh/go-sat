@@ -51,7 +51,7 @@ type Solver struct {
 
 	// assigns keeps track of variable assignment values. unassigned variables
 	// are never present in assigns.
-	assigns map[int]Tribool
+	assigns map[int]tribool
 
 	// varinfo holds information about an assigned variable. unassigned
 	// variables may be present here but their resulting information is
@@ -68,7 +68,7 @@ func New() *Solver {
 		vars: make(map[int]struct{}),
 
 		// trail
-		assigns: make(map[int]Tribool),
+		assigns: make(map[int]tribool),
 		varinfo: make(map[int]varinfo),
 
 		// two-literal watches
@@ -162,6 +162,9 @@ func (s *Solver) Solve() bool {
 				return true
 			}
 
+			// We have a new literal to assert. Create a new decision level
+			// since this is a decision literal and assert it. Decision
+			// literals have no reason clause.
 			if s.Trace {
 				s.Tracer.Printf("[TRACE] sat: assert: %s (decision)", lit)
 			}
@@ -173,6 +176,10 @@ func (s *Solver) Solve() bool {
 	return false
 }
 
+// selectLiteral returns the next decision literal to assert.
+//
+// NOTE: This logic is horrifyingly naive at the moment and improving
+// this even slightly would probably have some good gains for this solver.
 func (s *Solver) selectLiteral() cnf.Lit {
 	for raw, _ := range s.vars {
 		if _, ok := s.assigns[raw]; !ok {
@@ -187,32 +194,34 @@ func (s *Solver) selectLiteral() cnf.Lit {
 // Private types
 //-------------------------------------------------------------------
 
+// satResult is an enum type for the state of the SAT solver.
 type satResult byte
 
 const (
-	satResultUndef satResult = iota
-	satResultUnsat
-	satResultSat
+	satResultUndef satResult = iota // undefined, solve() valid
+	satResultUnsat                  // unsatisfied
+	satResultSat                    // satisified
 )
 
+// varinfo just stores some basic information about assigned variables
 type varinfo struct {
-	reason cnf.Clause
-	level  int
+	reason cnf.Clause // reason is the clause that caused this assignment
+	level  int        // level is the decision level of this assignment
 }
 
-// Tribool is a tri-state boolean with undefined as the 3rd state.
-type Tribool uint8
+// tribool is a tri-state boolean with undefined as the 3rd state.
+type tribool uint8
 
 const (
-	True  Tribool = 0
-	False         = 1
-	Undef         = 2
+	triTrue  tribool = 0
+	triFalse         = 1
+	triUndef         = 2
 )
 
-func BoolToTri(b bool) Tribool {
+func boolToTri(b bool) tribool {
 	if b {
-		return True
+		return triTrue
 	}
 
-	return False
+	return triFalse
 }

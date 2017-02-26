@@ -9,11 +9,25 @@ import (
 
 // This file contains the trail-related functions for the solver.
 
+// Assignments returns the assigned variables and their value (true or false).
+// This is only valid if Solve returned true, in which case this is the
+// solution.
+func (s *Solver) Assignments() map[int]bool {
+	result := make(map[int]bool)
+	for k, v := range s.assigns {
+		if v != triUndef {
+			result[k] = v == triTrue
+		}
+	}
+
+	return result
+}
+
 // ValueLit reads the currently set value for a literal.
-func (s *Solver) ValueLit(l cnf.Lit) Tribool {
+func (s *Solver) valueLit(l cnf.Lit) tribool {
 	result, ok := s.assigns[l.Var()]
-	if !ok || result == Undef {
-		return Undef
+	if !ok || result == triUndef {
+		return triUndef
 	}
 
 	// If the literal is negative (signed), then XOR 1 will cause the bool
@@ -28,7 +42,7 @@ func (s *Solver) ValueLit(l cnf.Lit) Tribool {
 func (s *Solver) assertLiteral(l cnf.Lit, from cnf.Clause) {
 	// Store the literal in the trail
 	v := l.Var()
-	s.assigns[v] = BoolToTri(!l.Sign())
+	s.assigns[v] = boolToTri(!l.Sign())
 	s.varinfo[v] = varinfo{reason: from, level: s.decisionLevel()}
 	s.trail = append(s.trail, l)
 }

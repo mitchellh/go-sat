@@ -90,8 +90,8 @@ func (s *Solver) propagate() cnf.Clause {
 			if first == pNeg {
 				if s.Trace {
 					s.Tracer.Printf(
-						"[TRACE] sat: hot swap %s => %s, %s => %s",
-						iLits[0], iLits[1], iLits[1], pNeg)
+						"[TRACE] sat: moving false literal %s to position 1",
+						iLits[0])
 				}
 
 				iLits[0], iLits[1] = iLits[1], pNeg
@@ -135,8 +135,13 @@ func (s *Solver) propagate() cnf.Clause {
 
 			// If it is false, then this is a conflict. We return immediately.
 			if s.ValueLit(first) == False {
-				j += copy(watches[j:], watches[i:]) // Copy remaining watches
-				s.watches[p] = watches[:j]
+				// If i != j then we pruned some watches. We need to copy
+				// the rest down. copy() is expensive so we avoid it if possible.
+				if i != j {
+					j += copy(watches[j:], watches[i:])
+					s.watches[p] = watches[:j]
+				}
+
 				return iW.Clause
 			}
 

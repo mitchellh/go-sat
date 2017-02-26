@@ -4,6 +4,8 @@ import (
 	"github.com/mitchellh/go-sat/cnf"
 )
 
+// learn performs the clause learning process after a conflict is found.
+// This returns the learned clause as well as the level to backjump to.
 func (s *Solver) learn(c cnf.Clause) (cnf.Clause, int) {
 	// Determine our learned clause
 	pathC := 0
@@ -39,15 +41,16 @@ func (s *Solver) learn(c cnf.Clause) (cnf.Clause, int) {
 		p = s.trail[idx+1]
 		c = s.varinfo[p.Var()].reason
 		s.seen[p.Var()] = 0
-		pathC--
 
+		pathC--
 		if pathC <= 0 {
 			break
 		}
 	}
 	learnt[0] = p.Neg()
 
-	// Determine the backtrack level
+	// Determine the level to backjump to. This is simply the maximum
+	// level represented in our learned clause.
 	backjumpLevel := 0
 	if len(learnt) > 1 {
 		maxI := 1

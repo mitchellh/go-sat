@@ -39,15 +39,18 @@ func Parse(r io.Reader) (*Problem, error) {
 	var result Problem
 	result.Variables = -1
 
+	// Current is the currently tracked clause
+	var current []cnf.Lit
+
 	// Create a bufio scanner so we can break it up by line
 	scanner := bufio.NewScanner(r)
 	read := 0
 	for scanner.Scan() {
 		raw := scanner.Bytes()
 
-		// Disallow blank lines
+		// If the line is blank, skip
 		if len(raw) == 0 {
-			return nil, fmt.Errorf("blank line not allowed in DIMACS CNF input")
+			continue
 		}
 
 		// If we don't know the number of variables we still haven't
@@ -95,36 +98,35 @@ func Parse(r io.Reader) (*Problem, error) {
 
 		// Read the line
 		fields := bytes.Fields(raw)
-		if len(fields) == 0 {
-			return nil, fmt.Errorf("clause line should not be empty")
-		}
-
-		// The file SHOULD terminate in a zero. However, some CNF files
-		// found don't. We accept both.
-		if string(fields[len(fields)-1]) == "0" {
-			fields = fields[:len(fields)-1]
-		}
 
 		// Read all the literals
-		c := make([]cnf.Lit, len(fields))
-		for i := 0; i < len(fields); i++ {
-			val, err := strconv.Atoi(string(fields[i]))
+		end := false
+		for _, raw := range fields {
+			val, err := strconv.Atoi(string(raw))
 			if err != nil {
 				return nil, fmt.Errorf(
-					"invalid literal %q", fields[i])
+					"invalid literal %q", raw)
 			}
 
-			c[i] = cnf.NewLitInt(val)
+			if val == 0 {
+				end = true
+				break
+			}
+
+			current = append(current, cnf.NewLitInt(val))
 		}
 
-		// Add it to our clauses
-		result.Formula = append(result.Formula, cnf.Clause(c))
+		// If we found the end, compile the clause
+		if end {
+			result.Formula = append(result.Formula, cnf.Clause(current))
+			current = nil
 
-		// Increment our count. If we've read all our expected clauses,
-		// then we're done.
-		read++
-		if read >= result.Clauses {
-			break
+			// Increment our count. If we've read all our expected clauses,
+			// then we're done.
+			read++
+			if read >= result.Clauses {
+				break
+			}
 		}
 	}
 

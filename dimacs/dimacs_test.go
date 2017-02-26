@@ -15,17 +15,6 @@ func TestParse(t *testing.T) {
 		Result [][]int
 	}{
 		{
-			"empty line",
-			`
-c Foo
-p cnf 1 1
-1 0
-`,
-			true,
-			nil,
-		},
-
-		{
 			"basic",
 			`c Foo
 p cnf 1 1
@@ -38,14 +27,31 @@ p cnf 1 1
 		},
 
 		{
-			"not ending a clause in zero",
+			"split across multiple lines",
 			`c Foo
-p cnf 1 1
+p cnf 2 1
 1
+2
+0
 `,
 			false,
 			[][]int{
-				[]int{1},
+				[]int{1, 2},
+			},
+		},
+
+		{
+			"blank line",
+			`c Foo
+p cnf 2 1
+
+1
+2
+0
+`,
+			false,
+			[][]int{
+				[]int{1, 2},
 			},
 		},
 

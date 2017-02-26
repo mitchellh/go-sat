@@ -99,15 +99,15 @@ func Parse(r io.Reader) (*Problem, error) {
 			return nil, fmt.Errorf("clause line should not be empty")
 		}
 
-		// Make sure it terminates properly
-		if string(fields[len(fields)-1]) != "0" {
-			return nil, fmt.Errorf(
-				"clause line should end in 0: %q", raw)
+		// The file SHOULD terminate in a zero. However, some CNF files
+		// found don't. We accept both.
+		if string(fields[len(fields)-1]) == "0" {
+			fields = fields[:len(fields)-1]
 		}
 
 		// Read all the literals
-		c := make([]cnf.Lit, len(fields)-1)
-		for i := 0; i < len(fields)-1; i++ {
+		c := make([]cnf.Lit, len(fields))
+		for i := 0; i < len(fields); i++ {
 			val, err := strconv.Atoi(string(fields[i]))
 			if err != nil {
 				return nil, fmt.Errorf(

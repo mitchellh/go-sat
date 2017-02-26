@@ -38,6 +38,18 @@ p cnf 1 1
 		},
 
 		{
+			"not ending a clause in zero",
+			`c Foo
+p cnf 1 1
+1
+`,
+			false,
+			[][]int{
+				[]int{1},
+			},
+		},
+
+		{
 			"multi-clause",
 			`c Foo
 p cnf 4 3

@@ -6,11 +6,11 @@ import (
 
 // learn performs the clause learning process after a conflict is found.
 // This returns the learned clause as well as the level to backjump to.
-func (s *Solver) learn(c cnf.Clause) (cnf.Clause, int) {
+func (s *Solver) learn(c cnf.Clause) int {
 	// Determine our learned clause
 	pathC := 0
+	s.learned = s.learned[:1]
 	p := cnf.LitUndef
-	learnt := make([]cnf.Lit, 1)
 	idx := len(s.trail) - 1
 	for {
 		j := 0
@@ -27,7 +27,7 @@ func (s *Solver) learn(c cnf.Clause) (cnf.Clause, int) {
 				if qLevel >= s.decisionLevel() {
 					pathC++
 				} else {
-					learnt = append(learnt, q)
+					s.learned = append(s.learned, q)
 				}
 			}
 		}
@@ -47,29 +47,30 @@ func (s *Solver) learn(c cnf.Clause) (cnf.Clause, int) {
 			break
 		}
 	}
-	learnt[0] = p.Neg()
+	s.learned[0] = p.Neg()
 
 	// Determine the level to backjump to. This is simply the maximum
 	// level represented in our learned clause.
 	backjumpLevel := 0
-	if len(learnt) > 1 {
+	if len(s.learned) > 1 {
 		maxI := 1
-		maxLevel := s.level(learnt[maxI].Var())
-		for i := 2; i < len(learnt); i++ {
-			if l := s.level(learnt[i].Var()); l > maxLevel {
+		maxLevel := s.level(s.learned[maxI].Var())
+		for i := 2; i < len(s.learned); i++ {
+			if l := s.level(s.learned[i].Var()); l > maxLevel {
 				maxI = i
 				maxLevel = l
 			}
 		}
 
-		learnt[maxI], learnt[1] = learnt[1], learnt[maxI]
+		s.learned[maxI], s.learned[1] = s.learned[1], s.learned[maxI]
 		backjumpLevel = maxLevel
 	}
 
-	// Clear seen for learnt clause
-	for _, l := range learnt {
+	// Clear seen for learned clause so that learning can visit them
+	// again on the next go-around.
+	for _, l := range s.learned {
 		s.seen[l.Var()] = 0
 	}
 
-	return cnf.Clause(learnt), backjumpLevel
+	return backjumpLevel
 }

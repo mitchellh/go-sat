@@ -32,7 +32,10 @@ type Solver struct {
 	// two-literal watching
 	qhead   int
 	watches map[cnf.Lit][]*watcher
+
+	// clause learning state
 	seen    map[int]int8
+	learned []cnf.Lit // current learned clause
 
 	//---------------------------------------------------------------
 	// trail
@@ -70,7 +73,10 @@ func New() *Solver {
 
 		// two-literal watches
 		watches: make(map[cnf.Lit][]*watcher),
+
+		// clause learning
 		seen:    make(map[int]int8),
+		learned: make([]cnf.Lit, 0, 10),
 	}
 }
 
@@ -114,9 +120,9 @@ func (s *Solver) Solve() bool {
 			}
 
 			// Learn
-			learnt, level := s.learn(conflictC)
+			level := s.learn(conflictC)
 			if s.Trace {
-				s.Tracer.Printf("[TRACE] sat: learned clause: %s", learnt)
+				s.Tracer.Printf("[TRACE] sat: learned clause: %s", s.learned)
 			}
 
 			// Backjump
@@ -128,18 +134,19 @@ func (s *Solver) Solve() bool {
 			}
 
 			// Add our learned clause
-			lits := learnt
 			if s.Trace {
 				s.Tracer.Printf(
-					"[TRACE] sat: asserting learned literal: %s", lits[0])
+					"[TRACE] sat: asserting learned literal: %s", s.learned[0])
 			}
-			if len(lits) == 1 {
-				s.assertLiteral(lits[0], nil)
+			if len(s.learned) == 1 {
+				s.assertLiteral(s.learned[0], nil)
 			} else {
-				c := cnf.Clause(lits)
+				c := cnf.Clause(make([]cnf.Lit, len(s.learned)))
+				copy(c, s.learned)
+
 				s.clauses = append(s.clauses, c)
 				s.watchClause(c)
-				s.assertLiteral(lits[0], c)
+				s.assertLiteral(c[0], c)
 			}
 		} else {
 			// Choose a literal to assert.

@@ -29,20 +29,17 @@ func TestSolve_table(t *testing.T) {
 	cases := []struct {
 		Name    string
 		Formula [][]int
-		Decide  []int
 		Result  bool
 	}{
 		{
 			"empty",
 			[][]int{},
-			nil,
 			true,
 		},
 
 		{
 			"single literal",
 			[][]int{[]int{4}},
-			nil,
 			true,
 		},
 
@@ -53,7 +50,6 @@ func TestSolve_table(t *testing.T) {
 				[]int{6},
 				[]int{-4, -6},
 			},
-			nil,
 			false,
 		},
 
@@ -63,7 +59,6 @@ func TestSolve_table(t *testing.T) {
 				[]int{-4},
 				[]int{4, -6},
 			},
-			nil,
 			true,
 		},
 
@@ -79,7 +74,6 @@ func TestSolve_table(t *testing.T) {
 				[]int{1, -6},
 				[]int{1, 7},
 			},
-			nil,
 			true,
 		},
 	}
@@ -89,7 +83,6 @@ func TestSolve_table(t *testing.T) {
 			s := New()
 			s.Trace = true
 			s.Tracer = newTracer(t)
-			s.decideLiterals = tc.Decide
 			s.AddFormula(cnf.NewFormulaFromInts(tc.Formula))
 
 			actual := s.Solve()

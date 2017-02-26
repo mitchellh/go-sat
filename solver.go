@@ -4,9 +4,21 @@ import (
 	"github.com/mitchellh/go-sat/cnf"
 )
 
-// Solver is a SAT solver. This should be created with New to get
-// the proper internal memory allocations. Using a manually allocated
-// Solver will probably crash.
+// Solver is a SAT solver.
+//
+// Solver must be created using New(). You cannot use a solver that is
+// manually allocated.
+//
+// Add clauses or a formula using the AddClause and AddFormula functions,
+// respectively. These must be called prior to calling Solve().
+//
+// Solve() will attempt to solve the problem, returning false on
+// unsatisfiability and true on satisfiability. A sufficiently complex
+// SAT problem may take a very long time (this solver currently doesn't
+// allow time budgeting).
+//
+// Assignments() can be called after Solve() returns true to get the
+// assigned values for a solution.
 type Solver struct {
 	// Trace, if set to true, will output trace debugging information
 	// via the standard library `log` package. If true, Tracer must also
@@ -14,11 +26,6 @@ type Solver struct {
 	// created with log.NewLogger.
 	Trace  bool
 	Tracer Tracer
-
-	// decideLiterals is to be set by tests to force a certain decision
-	// literal ordering. This can be used to exercise specific solver
-	// behavior being tested.
-	decideLiterals []int
 
 	//---------------------------------------------------------------
 	// Internal fields, do not set
@@ -116,6 +123,7 @@ func (s *Solver) Solve() bool {
 					s.Tracer.Printf("[TRACE] sat: at decision level 0. UNSAT")
 				}
 
+				s.result = satResultUnsat
 				return false
 			}
 
@@ -159,6 +167,7 @@ func (s *Solver) Solve() bool {
 					s.Tracer.Printf("[TRACE] sat: solver found solution: %s", s.trail)
 				}
 
+				s.result = satResultSat
 				return true
 			}
 
@@ -172,8 +181,6 @@ func (s *Solver) Solve() bool {
 			s.assertLiteral(lit, nil)
 		}
 	}
-
-	return false
 }
 
 // selectLiteral returns the next decision literal to assert.

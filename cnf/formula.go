@@ -15,3 +15,14 @@ func NewFormulaFromInts(v [][]int) Formula {
 
 	return Formula(cs)
 }
+
+// Int returns the integer-only representation of this formula. This
+// is often useful for testing, serialization, etc.
+func (f Formula) Int() [][]int {
+	result := make([][]int, len(f))
+	for i, c := range f {
+		result[i] = c.Int()
+	}
+
+	return result
+}

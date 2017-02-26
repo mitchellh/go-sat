@@ -14,3 +14,12 @@ func NewClauseFromInts(v []int) Clause {
 
 	return Clause(lits)
 }
+
+func (c Clause) Int() []int {
+	result := make([]int, len(c))
+	for i, l := range c {
+		result[i] = l.Int()
+	}
+
+	return result
+}

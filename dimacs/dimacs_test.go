@@ -79,7 +79,7 @@ whatever
 				return
 			}
 
-			actual := result.Formula.Ints()
+			actual := result.Formula.Int()
 			if !reflect.DeepEqual(actual, tc.Result) {
 				t.Fatalf("bad: %#v", actual)
 			}

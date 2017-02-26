@@ -39,7 +39,9 @@ func realMain() int {
 	}
 
 	// Solve the problem
-	result := sat.Solve(p.Formula)
+	var s sat.Solver
+	s.AddFormula(p.Formula)
+	result := s.Solve()
 	fmt.Printf("SAT: %v\n", result)
 	return 0
 }

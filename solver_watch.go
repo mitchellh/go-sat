@@ -1,15 +1,15 @@
 package sat
 
 import (
-	"github.com/mitchellh/go-sat/packed"
+	"github.com/mitchellh/go-sat/cnf"
 )
 
 type watcher struct {
-	Clause packed.Clause
-	Lit    packed.Lit
+	Clause cnf.Clause
+	Lit    cnf.Lit
 }
 
-func (s *Solver) watchClause(c packed.Clause) {
+func (s *Solver) watchClause(c cnf.Clause) {
 	c0 := c[0].Neg()
 	c1 := c[1].Neg()
 
@@ -23,8 +23,8 @@ func (s *Solver) watchClause(c packed.Clause) {
 	})
 }
 
-func (s *Solver) propagate() packed.Clause {
-	var conflict packed.Clause
+func (s *Solver) propagate() cnf.Clause {
+	var conflict cnf.Clause
 
 	for s.qhead < len(s.trail) {
 		p := s.trail[s.qhead]

@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mitchellh/go-sat/packed"
+	"github.com/mitchellh/go-sat/cnf"
 )
 
 // This file contains the trail-related functions for the solver.
 
 // ValueLit reads the currently set value for a literal.
-func (s *Solver) ValueLit(l packed.Lit) Tribool {
+func (s *Solver) ValueLit(l cnf.Lit) Tribool {
 	result, ok := s.assigns[l.Var()]
 	if !ok || result == Undef {
 		return Undef
@@ -25,7 +25,7 @@ func (s *Solver) ValueLit(l packed.Lit) Tribool {
 	return result
 }
 
-func (s *Solver) assertLiteral(l packed.Lit, from packed.Clause) {
+func (s *Solver) assertLiteral(l cnf.Lit, from cnf.Clause) {
 	// Store the literal in the trail
 	v := l.Var()
 	s.assigns[v] = BoolToTri(!l.Sign())

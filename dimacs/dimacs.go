@@ -106,7 +106,7 @@ func Parse(r io.Reader) (*Problem, error) {
 		}
 
 		// Read all the literals
-		c := make([]cnf.Literal, len(fields)-1)
+		c := make([]cnf.Lit, len(fields)-1)
 		for i := 0; i < len(fields)-1; i++ {
 			val, err := strconv.Atoi(string(fields[i]))
 			if err != nil {
@@ -114,7 +114,7 @@ func Parse(r io.Reader) (*Problem, error) {
 					"invalid literal %q", fields[i])
 			}
 
-			c[i] = cnf.Literal(val)
+			c[i] = cnf.NewLitInt(val)
 		}
 
 		// Add it to our clauses

@@ -3,13 +3,13 @@ package sat
 import (
 	"sort"
 
-	"github.com/mitchellh/go-sat/packed"
+	"github.com/mitchellh/go-sat/cnf"
 )
 
 // AddFormula adds the given formula to the solver.
 //
 // This can only be called before Solve() is called.
-func (s *Solver) AddFormula(f packed.Formula) {
+func (s *Solver) AddFormula(f cnf.Formula) {
 	for _, c := range f {
 		s.AddClause(c)
 	}
@@ -18,7 +18,7 @@ func (s *Solver) AddFormula(f packed.Formula) {
 // AddClause adds a Clause to solve to the solver.
 //
 // This can only be called before Solve() is called.
-func (s *Solver) AddClause(c packed.Clause) {
+func (s *Solver) AddClause(c cnf.Clause) {
 	// Get the actual slice since we'll be modifying this directly.
 	// The API docs say not to but its part of our package and we know
 	// what we're doing. :)
@@ -32,7 +32,7 @@ func (s *Solver) AddClause(c packed.Clause) {
 	// Keep track of an index since we'll be slicing as we go. We also
 	// keep track of the last value so that we can find tautologies (X | !X)
 	idx := 0
-	last := packed.LitUndef
+	last := cnf.LitUndef
 	for _, current := range lits {
 		// Due to the sorting X and !X will always be next to each other.
 		// A cheap way to check for tautologies is to just check the last
@@ -113,7 +113,7 @@ func (s *Solver) AddClause(c packed.Clause) {
 	}
 
 	// Add it to our formula
-	c = packed.Clause(lits)
+	c = cnf.Clause(lits)
 	s.clauses = append(s.clauses, c)
 	s.watchClause(c)
 }

@@ -67,12 +67,11 @@ func satlibBenchmarkFile(b *testing.B, path string) {
 	if err != nil {
 		b.Fatalf("err: %s", err)
 	}
-	packed := p.Formula.Pack()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		s := New()
-		s.AddFormula(packed)
+		s.AddFormula(p.Formula)
 		s.Solve()
 	}
 }

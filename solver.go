@@ -1,7 +1,7 @@
 package sat
 
 import (
-	"github.com/mitchellh/go-sat/packed"
+	"github.com/mitchellh/go-sat/cnf"
 )
 
 // Solver is a SAT solver. This should be created with New to get
@@ -26,12 +26,12 @@ type Solver struct {
 	result satResult
 
 	// problem
-	clauses []packed.Clause  // clauses to solve
+	clauses []cnf.Clause     // clauses to solve
 	vars    map[int]struct{} // list of available vars
 
 	// two-literal watching
 	qhead   int
-	watches map[packed.Lit][]*watcher
+	watches map[cnf.Lit][]*watcher
 	seen    map[int]int8
 
 	//---------------------------------------------------------------
@@ -40,7 +40,7 @@ type Solver struct {
 
 	// trail is the actual trail of assigned literals. The value assigned
 	// is in the assigns map.
-	trail []packed.Lit
+	trail []cnf.Lit
 
 	// trailIdx keeps track of the indices for new decision levels.
 	// trailIdx[level] = index to the start of that level in trail
@@ -69,7 +69,7 @@ func New() *Solver {
 		varinfo: make(map[int]varinfo),
 
 		// two-literal watches
-		watches: make(map[packed.Lit][]*watcher),
+		watches: make(map[cnf.Lit][]*watcher),
 		seen:    make(map[int]int8),
 	}
 }
@@ -132,7 +132,7 @@ func (s *Solver) Solve() bool {
 			if len(lits) == 1 {
 				s.assertLiteral(lits[0], nil)
 			} else {
-				c := packed.Clause(lits)
+				c := cnf.Clause(lits)
 				s.clauses = append(s.clauses, c)
 				s.watchClause(c)
 				s.assertLiteral(lits[0], c)
@@ -143,7 +143,7 @@ func (s *Solver) Solve() bool {
 
 			// If it is undef it means there are no more literals which means
 			// we have solved the formula
-			if lit == packed.LitUndef {
+			if lit == cnf.LitUndef {
 				if s.Trace {
 					s.Tracer.Printf("[TRACE] sat: solver found solution: %s", s.trail)
 				}
@@ -162,14 +162,14 @@ func (s *Solver) Solve() bool {
 	return false
 }
 
-func (s *Solver) selectLiteral() packed.Lit {
+func (s *Solver) selectLiteral() cnf.Lit {
 	for raw, _ := range s.vars {
 		if _, ok := s.assigns[raw]; !ok {
-			return packed.NewLit(raw, false)
+			return cnf.NewLit(raw, false)
 		}
 	}
 
-	return packed.LitUndef
+	return cnf.LitUndef
 }
 
 //-------------------------------------------------------------------
@@ -185,7 +185,7 @@ const (
 )
 
 type varinfo struct {
-	reason packed.Clause
+	reason cnf.Clause
 	level  int
 }
 

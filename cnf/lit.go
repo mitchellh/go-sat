@@ -1,4 +1,4 @@
-package packed
+package cnf
 
 import (
 	"fmt"

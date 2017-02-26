@@ -1,18 +1,18 @@
 package sat
 
 import (
-	"github.com/mitchellh/go-sat/packed"
+	"github.com/mitchellh/go-sat/cnf"
 )
 
-func (s *Solver) learn(c packed.Clause) (packed.Clause, int) {
+func (s *Solver) learn(c cnf.Clause) (cnf.Clause, int) {
 	// Determine our learned clause
 	pathC := 0
-	p := packed.LitUndef
-	learnt := make([]packed.Lit, 1)
+	p := cnf.LitUndef
+	learnt := make([]cnf.Lit, 1)
 	idx := len(s.trail) - 1
 	for {
 		j := 0
-		if p != packed.LitUndef {
+		if p != cnf.LitUndef {
 			j = 1
 		}
 
@@ -68,5 +68,5 @@ func (s *Solver) learn(c packed.Clause) (packed.Clause, int) {
 		s.seen[l.Var()] = 0
 	}
 
-	return packed.Clause(learnt), backjumpLevel
+	return cnf.Clause(learnt), backjumpLevel
 }

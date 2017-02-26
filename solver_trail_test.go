@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mitchellh/go-sat/packed"
+	"github.com/mitchellh/go-sat/cnf"
 )
 
 func TestSolverValueLit(t *testing.T) {
@@ -42,9 +42,9 @@ func TestSolverValueLit(t *testing.T) {
 	for i, tc := range cases {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			s := New()
-			s.assertLiteral(packed.NewLitInt(tc.Assert), nil)
+			s.assertLiteral(cnf.NewLitInt(tc.Assert), nil)
 
-			l := packed.NewLitInt(tc.Lit)
+			l := cnf.NewLitInt(tc.Lit)
 			result := s.ValueLit(l)
 			if result != tc.Result {
 				t.Fatalf("bad: %s", result)
@@ -86,7 +86,7 @@ func TestSolverTrimToDecisionLevel(t *testing.T) {
 					s.newDecisionLevel()
 				}
 
-				s.assertLiteral(packed.NewLitInt(l), nil)
+				s.assertLiteral(cnf.NewLitInt(l), nil)
 			}
 
 			s.trimToDecisionLevel(tc.Level)

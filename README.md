@@ -5,25 +5,17 @@ go-sat is a pure Go library for solving
 
 Solving SAT problems is at the core of a number of more difficult higher
 level problems. From hardware/software verification, scheduling constraints,
-version resolving, etc. many problems are reduced fully or partially to a basic
+version resolution, etc. many problems are reduced fully or partially to a
 SAT problem.
 
 Many existing SAT libraries exist that are efficient and easy to bind to
-Unfortunately, cgo has a considerable runtime cost in addition to increasing
-the complexity of cross-compilation. This library aims to be a pure Go SAT
+if using cgo is an option for you. This library aims to be a pure Go SAT
 solver that requires no cgo.
 
 ## Features
 
-The root package is `sat` which contains the SAT solver itself. The SAT
-solver is implemented with a standard iterative backtracking algorithm at its
-core. To improve efficiency, the following features/heuristics are used by
-this solver. Some of these obviously overlap:
-
-  * [Unit propogation](https://en.wikipedia.org/wiki/Unit_propagation)
-  * [Backjumping](https://en.wikipedia.org/wiki/Backjumping)
-  * [Clause Learning](https://en.wikipedia.org/wiki/Conflict-Driven_Clause_Learning)
-  * [Watched Literals](http://constraintmodelling.org/files/2015/07/GentJeffersonMiguelCP06.pdf)
+The root package is `sat` which contains the SAT solver itself that can
+solve a boolean formula.
 
 In addition to the solver, this library contains a number of sub-packages
 for working with SAT problems and formulas:
@@ -33,6 +25,24 @@ for working with SAT problems and formulas:
 
   * `dimacs` - A parser for the [DIMACS CNF format](http://www.domagoj-babic.com/uploads/ResearchProjects/Spear/dimacs-cnf.pdf),
     a widely accepted format for boolean formulas in [CNF](https://en.wikipedia.org/wiki/Conjunctive_normal_form).
+
+## Implementation and Performance
+
+go-sat is a fairly standard CDCL (conflict-driven clause learning) solver.
+The following ideas are present in go-sat:
+
+  * [Unit propogation](https://en.wikipedia.org/wiki/Unit_propagation)
+  * [Backjumping](https://en.wikipedia.org/wiki/Backjumping)
+  * [Clause Learning](https://en.wikipedia.org/wiki/Conflict-Driven_Clause_Learning)
+  * [Watched Literals](http://constraintmodelling.org/files/2015/07/GentJeffersonMiguelCP06.pdf)
+
+Numerous improvements can easily be made to the solver that aren't yet
+present: better decision literal selection, clause minimization, restart
+heuristics, etc.
+
+go-sat is still one or two orders of magnitude slower than leading SAT
+solvers (such as Minisat, CryptoMinisat, Glucose, MapleSAT, etc.). I'd
+love to narrow that gap and welcome any contributions towards that.
 
 ## Installation
 
@@ -112,3 +122,11 @@ Thanks to [Minisat](http://minisat.se/) for providing understandable
 and efficient implementations of SAT solving concepts. go-sat translates many
 of their data representations and algorithms directly due to the clarity
 of their implementation.
+
+Beyond Minisat, the SAT community is extremely active and filled with
+a large array of interesting research papers. Thanks to the authors of
+those papers for making your research public and the relentless dedication
+of many to improve SAT solving.
+
+I merely stood on the shoulders of prior work to implement a solver in Go,
+and claim no credit for any ideas here.

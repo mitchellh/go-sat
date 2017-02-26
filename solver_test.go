@@ -22,8 +22,8 @@ var (
 // satlibThreshold is the number of satlib tests to run per category
 // when flagSatlib is NOT set. This can be increased as the efficiency of
 // the solver improves.
-const satlibThreshold = 15
-const satlibBenchThreshold = 10
+const satlibThreshold = 10
+const satlibBenchThreshold = 5
 
 func TestSolve_table(t *testing.T) {
 	cases := []struct {
@@ -113,6 +113,7 @@ func satlibTestDir(t *testing.T, dir string) {
 	// If the directory has the prefix "sat" then we expect all
 	// tests within to be satisfiable. If not, we expect the opposite.
 	sat := strings.HasPrefix(base, "sat-")
+	file := strings.HasPrefix(base, "file-")
 
 	// Open the directory so we can read each file
 	dirF, err := os.Open(dir)
@@ -138,9 +139,14 @@ func satlibTestDir(t *testing.T, dir string) {
 			break
 		}
 
+		fileSat := sat
+		if file {
+			fileSat = strings.Contains(entry, "yes")
+		}
+
 		// Test this entry
 		t.Run(entry, func(t *testing.T) {
-			satlibTestFile(t, filepath.Join(dir, entry), sat)
+			satlibTestFile(t, filepath.Join(dir, entry), fileSat)
 		})
 	}
 }
@@ -160,7 +166,7 @@ func satlibTestFile(t *testing.T, path string, expected bool) {
 
 	// Solve it
 	s := New()
-	s.Trace = false
+	s.Trace = *flagImmediate
 	s.Tracer = newTracer(t)
 	s.AddFormula(p.Formula)
 

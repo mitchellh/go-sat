@@ -92,6 +92,10 @@ func (s *Solver) Solve() bool {
 	}
 
 	for {
+		if s.Trace {
+			s.Tracer.Printf("[TRACE] sat: new iteration. trail: %s", s.trailString())
+		}
+
 		conflictC := s.propagate()
 		if conflictC != nil {
 			if s.Trace {

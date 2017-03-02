@@ -12,6 +12,12 @@ Many existing SAT libraries exist that are efficient and easy to bind to
 if using cgo is an option for you. This library aims to be a pure Go SAT
 solver that requires no cgo.
 
+It is highly unlikely that this library will ever be as fast as leading
+SAT solvers in the field. If you require performance or are solving 
+hard SAT problems, you may want to consider wrapping an existing SAT solver
+with cgo or via os/exec. However, having a pure Go SAT solver is useful
+for easy cross-compilation in many real world cases.
+
 ## Features
 
 The root package is `sat` which contains the SAT solver itself that can

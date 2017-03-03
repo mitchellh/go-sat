@@ -211,9 +211,8 @@ func satlibDirs(t testiface.T) []string {
 func newTracer(t *testing.T) Tracer {
 	if *flagImmediate {
 		return &immediateTracer{}
-	} else {
-		return &testTracer{T: t}
 	}
+	return &testTracer{T: t}
 }
 
 // testTracer is a Tracer implementation that sends output to the test logger.

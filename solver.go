@@ -97,8 +97,7 @@ func (s *Solver) Solve() bool {
 	// or via the AddClause process.
 	if s.result != satResultUndef {
 		if s.Trace {
-			s.Tracer.Printf(
-				"[TRACE] sat: result is already available: %s", s.result)
+			s.Tracer.Printf("[TRACE] sat: result is already available: %T", s.result)
 		}
 
 		return s.result == satResultSat

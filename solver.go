@@ -187,7 +187,7 @@ func (s *Solver) Solve() bool {
 // NOTE: This logic is horrifyingly naive at the moment and improving
 // this even slightly would probably have some good gains for this solver.
 func (s *Solver) selectLiteral() cnf.Lit {
-	for raw, _ := range s.vars {
+	for raw := range s.vars {
 		if _, ok := s.assigns[raw]; !ok {
 			return cnf.NewLit(raw, false)
 		}

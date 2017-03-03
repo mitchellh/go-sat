@@ -47,7 +47,7 @@ func TestSolverValueLit(t *testing.T) {
 			l := cnf.NewLitInt(tc.Lit)
 			result := s.valueLit(l)
 			if result != tc.Result {
-				t.Fatalf("bad: %s", result)
+				t.Fatalf("bad: %T", result)
 			}
 		})
 	}

@@ -97,8 +97,7 @@ func (s *Solver) Solve() bool {
 	// or via the AddClause process.
 	if s.result != satResultUndef {
 		if s.Trace {
-			s.Tracer.Printf(
-				"[TRACE] sat: result is already available: %s", s.result)
+			s.Tracer.Printf("[TRACE] sat: result is already available: %T", s.result)
 		}
 
 		return s.result == satResultSat
@@ -188,7 +187,7 @@ func (s *Solver) Solve() bool {
 // NOTE: This logic is horrifyingly naive at the moment and improving
 // this even slightly would probably have some good gains for this solver.
 func (s *Solver) selectLiteral() cnf.Lit {
-	for raw, _ := range s.vars {
+	for raw := range s.vars {
 		if _, ok := s.assigns[raw]; !ok {
 			return cnf.NewLit(raw, false)
 		}
